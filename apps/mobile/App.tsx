@@ -1,44 +1,44 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
-import { MacroTargets, formatMacroValue } from '@meal-planning/shared';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import HomeScreen from './screens/HomeScreen';
+import AddFoodScreen from './screens/AddFoodScreen';
+
+const Tab = createBottomTabNavigator();
 
 export default function App() {
-  // Example usage of shared types
-  const targetMacros: MacroTargets = {
-    calories: 2000,
-    protein: 150,
-    carbs: 200,
-    fat: 65,
-  };
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Meal Planning App</Text>
-      <Text style={styles.subtitle}>Daily Macro Targets:</Text>
-      <Text>{formatMacroValue(targetMacros.calories, 'calories')}</Text>
-      <Text>Protein: {formatMacroValue(targetMacros.protein, 'grams')}</Text>
-      <Text>Carbs: {formatMacroValue(targetMacros.carbs, 'grams')}</Text>
-      <Text>Fat: {formatMacroValue(targetMacros.fat, 'grams')}</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <Tab.Navigator
+          screenOptions={{
+            tabBarActiveTintColor: '#007AFF',
+            tabBarInactiveTintColor: '#8E8E93',
+          }}
+        >
+          <Tab.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{
+              title: 'Home',
+              tabBarIcon: ({ color }) => (
+                <Ionicons name="home" size={24} color={color} />
+              ),
+            }}
+          />
+          <Tab.Screen
+            name="AddFood"
+            component={AddFoodScreen}
+            options={{
+              title: 'Add Food',
+              tabBarIcon: ({ color }) => (
+                <Ionicons name="add-circle" size={24} color={color} />
+              ),
+            }}
+          />
+        </Tab.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  subtitle: {
-    fontSize: 18,
-    marginBottom: 10,
-  },
-});
