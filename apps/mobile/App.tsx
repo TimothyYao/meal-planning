@@ -19,6 +19,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from './screens/HomeScreen';
 import AddFoodScreen from './screens/AddFoodScreen';
+import ProfileScreen from './screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -49,6 +50,16 @@ export default function App() {
               title: 'Add Food',
               tabBarIcon: ({ color }) => (
                 <Ionicons name="add-circle" size={24} color={color} />
+              ),
+            }}
+          />
+          <Tab.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{
+              title: 'Profile',
+              tabBarIcon: ({ color }) => (
+                <Ionicons name="person" size={24} color={color} />
               ),
             }}
           />
