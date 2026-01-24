@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { MacroTargets, formatMacroValue, DailyLog } from '@meal-planning/shared'
+import type { MacroTargets } from '@meal-planning/shared'
+import { formatMacroValue } from '@meal-planning/shared'
 import './App.css'
 
 function App() {
