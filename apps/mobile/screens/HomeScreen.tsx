@@ -69,6 +69,26 @@ export default function HomeScreen() {
     return Math.min((current / target) * 100, 100);
   };
 
+  const formatNumber = (value: number) => {
+    const rounded = Math.round(value * 10) / 10;
+    return Number.isInteger(rounded) ? `${rounded}` : `${rounded}`;
+  };
+
+  const formatServingSize = (size: number, unit: string) => {
+    const sizeText = formatNumber(size);
+    return unit ? `${sizeText} ${unit}` : sizeText;
+  };
+
+  const formatServingInfo = (quantity: number, servingSize: number, servingUnit: string) => {
+    const qtyText = formatNumber(quantity);
+    const label = quantity === 1 ? 'serving' : 'servings';
+    return `${qtyText} ${label} • ${formatServingSize(servingSize, servingUnit)}`;
+  };
+
+  const calculateCaloriesFromMacros = (macros: { protein: number; carbs: number; fat: number }) => {
+    return macros.protein * 4 + macros.carbs * 4 + macros.fat * 9;
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Today's Macros</Text>
@@ -213,12 +233,19 @@ export default function HomeScreen() {
                 meal.foods.map((mealFood, index) => (
                   <View key={`${meal.id}-${index}`} style={styles.foodItem}>
                     <View style={styles.foodInfo}>
-                      <Text style={styles.foodName}>
-                        {mealFood.food.name} {mealFood.quantity > 1 && `× ${mealFood.quantity}`}
-                      </Text>
+                      <View style={styles.foodDetails}>
+                        <Text style={styles.foodName}>{mealFood.food.name}</Text>
+                        <Text style={styles.foodServing}>
+                          {formatServingInfo(
+                            mealFood.quantity,
+                            mealFood.food.servingSize,
+                            mealFood.food.servingUnit
+                          )}
+                        </Text>
+                      </View>
                       <Text style={styles.foodMacros}>
                         {formatMacroValue(
-                          mealFood.food.macros.calories * mealFood.quantity,
+                          calculateCaloriesFromMacros(mealFood.food.macros) * mealFood.quantity,
                           'calories'
                         )}
                       </Text>
@@ -341,11 +368,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#34c759',
     borderRadius: 3,
   },
-  progressText: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
   foodItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -358,12 +380,20 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+  },
+  foodDetails: {
+    flex: 1,
     marginRight: 12,
   },
   foodName: {
     fontSize: 16,
     flex: 1,
+  },
+  foodServing: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
   foodMacros: {
     fontSize: 16,

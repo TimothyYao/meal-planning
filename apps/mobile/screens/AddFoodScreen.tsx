@@ -27,13 +27,24 @@ const DEFAULT_SERVING_ID = '100g';
 
 export default function AddFoodScreen() {
   const [foodName, setFoodName] = useState('');
-  const [calories, setCalories] = useState('');
   const [protein, setProtein] = useState('');
   const [carbs, setCarbs] = useState('');
   const [fat, setFat] = useState('');
   const [selectedServingId, setSelectedServingId] = useState(DEFAULT_SERVING_ID);
   const [quantity, setQuantity] = useState('1');
   const [servingPickerExpanded, setServingPickerExpanded] = useState(false);
+
+  const calculateCaloriesFromMacros = (proteinValue: number, carbsValue: number, fatValue: number) => {
+    return proteinValue * 4 + carbsValue * 4 + fatValue * 9;
+  };
+
+  const proteinValue = parseFloat(protein) || 0;
+  const carbsValue = parseFloat(carbs) || 0;
+  const fatValue = parseFloat(fat) || 0;
+  const calculatedCalories = calculateCaloriesFromMacros(proteinValue, carbsValue, fatValue);
+  const caloriesText = Number.isFinite(calculatedCalories)
+    ? `${Math.round(calculatedCalories)}`
+    : '0';
 
   const handleSave = async () => {
     if (!foodName.trim()) {
@@ -42,10 +53,10 @@ export default function AddFoodScreen() {
     }
 
     const macros: MacroTargets = {
-      calories: parseFloat(calories) || 0,
-      protein: parseFloat(protein) || 0,
-      carbs: parseFloat(carbs) || 0,
-      fat: parseFloat(fat) || 0,
+      calories: calculatedCalories,
+      protein: proteinValue,
+      carbs: carbsValue,
+      fat: fatValue,
     };
 
     const serving = SERVING_OPTIONS.find((option) => option.id === selectedServingId);
@@ -103,13 +114,13 @@ export default function AddFoodScreen() {
         <Text style={styles.sectionTitle}>Macros (per serving)</Text>
 
         <View style={styles.macroRow}>
-          <Text style={styles.label}>Calories</Text>
+          <Text style={styles.label}>Calories (auto)</Text>
           <TextInput
             style={styles.input}
             placeholder="0"
-            value={calories}
-            onChangeText={setCalories}
+            value={caloriesText}
             keyboardType="numeric"
+            editable={false}
           />
         </View>
 
