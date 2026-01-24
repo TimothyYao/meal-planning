@@ -1,3 +1,18 @@
+/**
+ * NOTE: Using React Navigation 7.0.0 due to compatibility issues with React 19.
+ * 
+ * React Navigation 7.1.27+ and 7.9.1+ have a known bug with React 19.1.0:
+ * https://github.com/react-navigation/react-navigation/issues/12921
+ * 
+ * Error: "TypeError: expected dynamic type 'boolean', but had type 'string'"
+ * 
+ * React Navigation 7.0.0 is being used as a workaround. If issues persist,
+ * consider:
+ * - Using React Navigation 8 alpha (requires dev build, not Expo Go)
+ * - Waiting for React Navigation 8 stable release
+ * - Using a custom tab navigation solution
+ */
+
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
