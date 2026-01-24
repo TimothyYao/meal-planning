@@ -86,6 +86,15 @@ export function ServingSizePicker({
     return id;
   };
 
+  const finalizeSelectionAt = (x: number, y: number) => {
+    const id = handleTouchAt(x, y);
+    if (id) {
+      handleSelect(id);
+    } else {
+      closePicker();
+    }
+  };
+
   return (
     <View>
       <Pressable
@@ -95,6 +104,20 @@ export function ServingSizePicker({
           onExpandedChange(true);
           setHoveredId(null);
         }}
+        pressRetentionOffset={{ top: 1000, bottom: 1000, left: 1000, right: 1000 }}
+        onTouchEnd={(event) => {
+          if (!isExpanded) {
+            return;
+          }
+          finalizeSelectionAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
+        }}
+        onTouchMove={(event) => {
+          if (!isExpanded) {
+            return;
+          }
+          handleTouchAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
+        }}
+        onTouchCancel={closePicker}
       >
         <Text style={[styles.chipText, styles.chipTextSelected]}>{selectedLabel}</Text>
       </Pressable>
@@ -116,12 +139,7 @@ export function ServingSizePicker({
               handleTouchAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
             }}
             onTouchEnd={(event) => {
-              const id = handleTouchAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
-              if (id) {
-                handleSelect(id);
-              } else {
-                closePicker();
-              }
+              finalizeSelectionAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
             }}
             onTouchCancel={closePicker}
           >

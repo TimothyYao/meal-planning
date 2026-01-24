@@ -13,13 +13,14 @@ import { saveFood, addFoodToToday } from '../utils/storage';
 import { ServingOption, ServingSizePicker } from '../components/ServingSizePicker';
 
 const SERVING_OPTIONS: ServingOption[] = [
-  { id: '100g', value: 100, unit: 'g', label: '100 g' },
-  { id: '1cup', value: 240, unit: 'ml', label: '1 cup (240 ml)' },
-  { id: '1tbsp', value: 15, unit: 'ml', label: '1 tbsp (15 ml)' },
+  { id: '1ml', value: 1, unit: 'ml', label: '1 ml' },
   { id: '1tsp', value: 5, unit: 'ml', label: '1 tsp (5 ml)' },
+  { id: '1tbsp', value: 15, unit: 'ml', label: '1 tbsp (15 ml)' },
+  { id: '100ml', value: 100, unit: 'ml', label: '100 ml' },
   { id: '1piece', value: 1, unit: 'piece', label: '1 piece' },
-  { id: '1slice', value: 1, unit: 'slice', label: '1 slice' },
+  { id: '1cup', value: 240, unit: 'ml', label: '1 cup (240 ml)' },
   { id: '1serving', value: 1, unit: 'serving', label: '1 serving' },
+  { id: '100g', value: 100, unit: 'g', label: '100 g' },
 ];
 
 const DEFAULT_SERVING_ID = '100g';
