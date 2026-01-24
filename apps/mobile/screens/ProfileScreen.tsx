@@ -1,5 +1,16 @@
-import { StyleSheet, Text, View, ScrollView } from 'react-native';
+import { useState, useEffect } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { UserProfile, MacroTargets, formatMacroValue } from '@meal-planning/shared';
+import { getTodayLog, setTodayTargetMacros } from '../utils/storage';
 
 export default function ProfileScreen() {
   // Example profile data - in a real app, this would come from state/storage
@@ -18,6 +29,76 @@ export default function ProfileScreen() {
       carbs: 200,
       fat: 65,
     },
+  };
+
+  const [calories, setCalories] = useState('2000');
+  const [protein, setProtein] = useState('150');
+  const [carbs, setCarbs] = useState('200');
+  const [fat, setFat] = useState('65');
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [originalTargets, setOriginalTargets] = useState<MacroTargets | null>(null);
+
+  useEffect(() => {
+    loadTargets();
+  }, []);
+
+  const loadTargets = async () => {
+    try {
+      const todayLog = await getTodayLog();
+      if (todayLog?.targetMacros) {
+        setCalories(todayLog.targetMacros.calories.toString());
+        setProtein(todayLog.targetMacros.protein.toString());
+        setCarbs(todayLog.targetMacros.carbs.toString());
+        setFat(todayLog.targetMacros.fat.toString());
+        setOriginalTargets(todayLog.targetMacros);
+      } else {
+        const defaults = { calories: 2000, protein: 150, carbs: 200, fat: 65 };
+        setOriginalTargets(defaults);
+      }
+    } catch (error) {
+      console.error('Error loading targets:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleCancel = () => {
+    if (originalTargets) {
+      setCalories(originalTargets.calories.toString());
+      setProtein(originalTargets.protein.toString());
+      setCarbs(originalTargets.carbs.toString());
+      setFat(originalTargets.fat.toString());
+    }
+    setIsEditing(false);
+  };
+
+  const handleSave = async () => {
+    const targets: MacroTargets = {
+      calories: parseFloat(calories) || 0,
+      protein: parseFloat(protein) || 0,
+      carbs: parseFloat(carbs) || 0,
+      fat: parseFloat(fat) || 0,
+    };
+
+    if (targets.calories <= 0) {
+      Alert.alert('Error', 'Calories must be greater than 0');
+      return;
+    }
+
+    try {
+      await setTodayTargetMacros(targets);
+      setOriginalTargets(targets);
+      setIsEditing(false);
+      Alert.alert('Success', 'Target macros updated');
+    } catch (error) {
+      console.error('Error saving targets:', error);
+      Alert.alert('Error', 'Failed to save targets. Please try again.');
+    }
   };
 
   const bmi = profile.weight && profile.height
@@ -77,33 +158,100 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Daily Macro Targets</Text>
-        <View style={styles.macroCard}>
-          <Text style={styles.macroValue}>
-            {formatMacroValue(profile.targetMacros.calories, 'calories')}
-          </Text>
-          <Text style={styles.macroLabel}>Calories</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Daily Macro Targets</Text>
+          {!isEditing ? (
+            <TouchableOpacity onPress={handleEdit} style={styles.editButton}>
+              <Ionicons name="pencil" size={20} color="#007AFF" />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.editActions}>
+              <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleSave} style={styles.saveButtonSmall}>
+                <Text style={styles.saveButtonTextSmall}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-        <View style={styles.macroRow}>
-          <View style={styles.macroCard}>
-            <Text style={styles.macroValue}>
-              {formatMacroValue(profile.targetMacros.protein, 'grams')}
-            </Text>
-            <Text style={styles.macroLabel}>Protein</Text>
-          </View>
-          <View style={styles.macroCard}>
-            <Text style={styles.macroValue}>
-              {formatMacroValue(profile.targetMacros.carbs, 'grams')}
-            </Text>
-            <Text style={styles.macroLabel}>Carbs</Text>
-          </View>
-          <View style={styles.macroCard}>
-            <Text style={styles.macroValue}>
-              {formatMacroValue(profile.targetMacros.fat, 'grams')}
-            </Text>
-            <Text style={styles.macroLabel}>Fat</Text>
-          </View>
-        </View>
+
+        {isEditing ? (
+          <>
+            <View style={styles.inputRow}>
+              <Text style={styles.inputLabel}>Calories</Text>
+              <TextInput
+                style={styles.input}
+                value={calories}
+                onChangeText={setCalories}
+                keyboardType="numeric"
+                placeholder="2000"
+              />
+            </View>
+
+            <View style={styles.macroInputRow}>
+              <View style={styles.macroInputContainer}>
+                <Text style={styles.inputLabel}>Protein (g)</Text>
+                <TextInput
+                  style={styles.macroInput}
+                  value={protein}
+                  onChangeText={setProtein}
+                  keyboardType="numeric"
+                  placeholder="150"
+                />
+              </View>
+              <View style={styles.macroInputContainer}>
+                <Text style={styles.inputLabel}>Carbs (g)</Text>
+                <TextInput
+                  style={styles.macroInput}
+                  value={carbs}
+                  onChangeText={setCarbs}
+                  keyboardType="numeric"
+                  placeholder="200"
+                />
+              </View>
+              <View style={styles.macroInputContainer}>
+                <Text style={styles.inputLabel}>Fat (g)</Text>
+                <TextInput
+                  style={styles.macroInput}
+                  value={fat}
+                  onChangeText={setFat}
+                  keyboardType="numeric"
+                  placeholder="65"
+                />
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.macroCard}>
+              <Text style={styles.macroValue}>
+                {formatMacroValue(parseFloat(calories) || 0, 'calories')}
+              </Text>
+              <Text style={styles.macroLabel}>Calories</Text>
+            </View>
+            <View style={styles.macroRow}>
+              <View style={styles.macroCard}>
+                <Text style={styles.macroValue}>
+                  {formatMacroValue(parseFloat(protein) || 0, 'grams')}
+                </Text>
+                <Text style={styles.macroLabel}>Protein</Text>
+              </View>
+              <View style={styles.macroCard}>
+                <Text style={styles.macroValue}>
+                  {formatMacroValue(parseFloat(carbs) || 0, 'grams')}
+                </Text>
+                <Text style={styles.macroLabel}>Carbs</Text>
+              </View>
+              <View style={styles.macroCard}>
+                <Text style={styles.macroValue}>
+                  {formatMacroValue(parseFloat(fat) || 0, 'grams')}
+                </Text>
+                <Text style={styles.macroLabel}>Fat</Text>
+              </View>
+            </View>
+          </>
+        )}
       </View>
     </ScrollView>
   );
@@ -141,10 +289,45 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 30,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    marginBottom: 16,
+  },
+  editButton: {
+    padding: 8,
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  saveButtonSmall: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+  },
+  saveButtonTextSmall: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   infoRow: {
     flexDirection: 'row',
@@ -181,5 +364,50 @@ const styles = StyleSheet.create({
   macroLabel: {
     fontSize: 14,
     color: '#666',
+  },
+  inputRow: {
+    marginBottom: 16,
+  },
+  macroInputRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 20,
+  },
+  macroInputContainer: {
+    flex: 1,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 8,
+    color: '#333',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+  },
+  macroInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
   },
 });
