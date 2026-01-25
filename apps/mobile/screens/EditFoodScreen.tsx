@@ -1,17 +1,22 @@
 import { StyleSheet, Text, View, Alert, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { FoodItem } from '@meal-planning/shared';
-import { saveFood } from '../utils/storage';
+import { saveFood, getFoodById, updateFoodQuantityInDate, moveFoodToDate, getTodayDate } from '../utils/storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
+import { NumberEditor } from '../components/NumberEditor';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useFocusEffect } from '@react-navigation/native';
-import { useState, useCallback } from 'react';
-import { getFoodById } from '../utils/storage';
+import { useCallback } from 'react';
 
 type EditFoodRouteParams = {
   foodId: string;
+  mealId?: string;
+  foodIndex?: number;
+  date?: string; // YYYY-MM-DD format
+  quantity?: number;
 };
 
 type EditFoodRouteProp = RouteProp<{ EditFood: EditFoodRouteParams }, 'EditFood'>;
@@ -20,10 +25,13 @@ export default function EditFoodScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const route = useRoute<EditFoodRouteProp>();
-  const { foodId } = route.params;
+  const { foodId, mealId, foodIndex, date, quantity: initialQuantity = 1 } = route.params;
   const [food, setFood] = useState<FoodItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showQuantityEditor, setShowQuantityEditor] = useState(false);
+  const [currentQuantity, setCurrentQuantity] = useState(initialQuantity);
   const formRef = useRef<FoodFormRef>(null);
+  const isExistingLog = mealId !== undefined && foodIndex !== undefined;
 
   // Load food data when screen comes into focus
   useFocusEffect(
@@ -40,14 +48,61 @@ export default function EditFoodScreen() {
     }, [foodId])
   );
 
-  const handleSave = async (editedFood: FoodItem, quantity: number) => {
+  const handleSave = async (editedFood: FoodItem, quantity: number, newDate?: Date) => {
     try {
       await saveFood(editedFood);
+      
+      // If this is an existing log entry, update the quantity and potentially move the date
+      if (isExistingLog && mealId && foodIndex !== undefined) {
+        const oldDate = date || getTodayDate();
+        const newDateString = newDate ? formatDateString(newDate) : oldDate;
+        
+        // If date changed, move the food to the new date
+        if (newDateString !== oldDate) {
+          await moveFoodToDate(oldDate, newDateString, mealId, foodIndex);
+        } else {
+          // Just update the quantity if date didn't change
+          await updateFoodQuantityInDate(oldDate, mealId, foodIndex, currentQuantity);
+        }
+      }
+      
       navigation.goBack();
     } catch (error) {
       console.error('Error updating food:', error);
       Alert.alert('Error', 'Failed to update food. Please try again.');
     }
+  };
+
+  const formatDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleEditQuantity = () => {
+    setShowQuantityEditor(true);
+  };
+
+  const handleSaveQuantity = async (newQuantity: number) => {
+    setCurrentQuantity(newQuantity);
+    setShowQuantityEditor(false);
+    
+    // If this is an existing log entry, update it in the log
+    if (isExistingLog && mealId && foodIndex !== undefined) {
+      try {
+        const dateToUpdate = date || getTodayDate();
+        await updateFoodQuantityInDate(dateToUpdate, mealId, foodIndex, newQuantity);
+      } catch (error) {
+        console.error('Error updating quantity:', error);
+        Alert.alert('Error', 'Failed to update quantity. Please try again.');
+      }
+    }
+  };
+
+  const formatNumber = (value: number) => {
+    const rounded = Math.round(value * 10) / 10;
+    return Number.isInteger(rounded) ? `${rounded}` : `${rounded}`;
   };
 
   const handleValidationError = (message: string) => {
@@ -90,11 +145,30 @@ export default function EditFoodScreen() {
         <FoodForm
           ref={formRef}
           initialFood={food}
+          initialQuantity={initialQuantity.toString()}
+          initialDate={date ? new Date(date + 'T00:00:00') : new Date()}
           onSave={handleSave}
           showQuantity={false}
+          showDate={isExistingLog}
           hideSaveButton={true}
           onValidationError={handleValidationError}
+          noPadding={true}
         />
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Serving Information</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Number of Servings</Text>
+            <TouchableOpacity
+              style={styles.quantityRow}
+              onPress={handleEditQuantity}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.infoValue}>{formatNumber(currentQuantity)}</Text>
+              <Ionicons name="pencil" size={16} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
 
       <View style={[styles.bottomButtonContainer, { paddingBottom: insets.bottom + 20 }]}>
@@ -114,6 +188,19 @@ export default function EditFoodScreen() {
           <Text style={styles.saveButtonText}>Save</Text>
         </TouchableOpacity>
       </View>
+
+      <NumberEditor
+        visible={showQuantityEditor}
+        value={currentQuantity}
+        onSave={handleSaveQuantity}
+        onCancel={() => setShowQuantityEditor(false)}
+        min={0.1}
+        max={999}
+        title="Number of Servings"
+        unit="servings"
+        keyboardType="decimal-pad"
+        hideRange={true}
+      />
     </View>
   );
 }
@@ -183,5 +270,35 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 17,
     fontWeight: '400',
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  infoLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  quantityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });

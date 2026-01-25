@@ -1,12 +1,10 @@
 import { StyleSheet, Text, View, Alert, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { useRef, useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import { useRef } from 'react';
 import { FoodItem } from '@meal-planning/shared';
 import { saveFood, addFoodToDate } from '../utils/storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
-import CalendarPicker from '../components/CalendarPicker';
 
 type AddFoodRouteParams = {
   duplicateFood?: FoodItem;
@@ -20,8 +18,6 @@ export default function AddFoodScreen() {
   const route = useRoute<AddFoodRouteProp>();
   const duplicateFood = route.params?.duplicateFood;
   const formRef = useRef<FoodFormRef>(null);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [calendarVisible, setCalendarVisible] = useState(false);
 
   // Format date to YYYY-MM-DD
   const formatDateString = (date: Date): string => {
@@ -40,12 +36,13 @@ export default function AddFoodScreen() {
     );
   };
 
-  const handleSave = async (foodItem: FoodItem, quantity: number) => {
+  const handleSave = async (foodItem: FoodItem, quantity: number, date?: Date) => {
     try {
       // Save food to database
       await saveFood(foodItem);
       
       // Add to selected date's log
+      const selectedDate = date || new Date();
       const dateString = formatDateString(selectedDate);
       await addFoodToDate(foodItem, quantity, dateString);
 
@@ -91,43 +88,19 @@ export default function AddFoodScreen() {
         ]}
       >
         <Text style={styles.title}>Add Food</Text>
-        
-        <View style={styles.dateSection}>
-          <Text style={styles.dateLabel}>Date</Text>
-          <TouchableOpacity
-            onPress={() => setCalendarVisible(true)}
-            style={styles.dateButton}
-          >
-            <Text style={styles.dateButtonText}>
-              {isToday(selectedDate)
-                ? 'Today'
-                : selectedDate.toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-            </Text>
-            <Ionicons name="calendar-outline" size={20} color="#007AFF" />
-          </TouchableOpacity>
-        </View>
 
         <FoodForm
           ref={formRef}
           initialFood={duplicateFood}
+          initialDate={new Date()}
           onSave={handleSave}
           showQuantity={true}
+          showDate={true}
           hideSaveButton={true}
           onValidationError={handleValidationError}
+          noPadding={true}
         />
       </ScrollView>
-
-      <CalendarPicker
-        visible={calendarVisible}
-        selectedDate={selectedDate}
-        onDateSelect={setSelectedDate}
-        onClose={() => setCalendarVisible(false)}
-      />
 
       <View style={[styles.bottomButtonContainer, { paddingBottom: insets.bottom + 20 }]}>
         <TouchableOpacity 
@@ -165,29 +138,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 20,
-  },
-  dateSection: {
-    marginBottom: 24,
-  },
-  dateLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 8,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e5ea',
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#000',
   },
   bottomButtonContainer: {
     position: 'absolute',

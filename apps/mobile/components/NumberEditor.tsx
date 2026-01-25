@@ -21,6 +21,7 @@ export type NumberEditorProps = {
   unit?: string;
   placeholder?: string;
   keyboardType?: 'decimal-pad' | 'number-pad';
+  hideRange?: boolean;
 };
 
 export function NumberEditor({
@@ -34,6 +35,7 @@ export function NumberEditor({
   unit,
   placeholder,
   keyboardType = 'decimal-pad',
+  hideRange = false,
 }: NumberEditorProps) {
   const [editValue, setEditValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -56,13 +58,13 @@ export function NumberEditor({
     onCancel();
   };
 
-  const displayPlaceholder = placeholder ?? `${min} - ${max}`;
+  const displayPlaceholder = placeholder ?? (hideRange ? '' : `${min} - ${max}`);
   // When focused and empty, use a space character to help center the cursor
   // This is a workaround for React Native's cursor positioning bug with centered text
   const showPlaceholder = !isFocused || editValue.length > 0;
   const placeholderValue = showPlaceholder ? displayPlaceholder : ' '; // Space character for centering
 
-  const titleWithRange = `${title} (${min} - ${max})`;
+  const titleWithRange = hideRange ? title : `${title} (${min} - ${max})`;
 
   return (
     <Modal

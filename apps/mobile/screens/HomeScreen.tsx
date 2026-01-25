@@ -435,6 +435,9 @@ export default function HomeScreen() {
                           foodId: mealFood.food.id,
                           quantity: mealFood.quantity,
                           addedAt: mealFood.addedAt ? mealFood.addedAt.toISOString() : undefined,
+                          mealId: meal.id,
+                          foodIndex: index,
+                          date: formatDateString(selectedDate),
                         });
                       }}
                       onRemove={() => handleRemoveFood(meal.id, index, mealFood.food.name)}

@@ -22,6 +22,8 @@ import {
 } from '../utils/storage';
 import { ServingOption, ServingSizePicker } from './ServingSizePicker';
 import { MacroAmountPicker } from './MacroAmountPicker';
+import { NumberEditor } from './NumberEditor';
+import CalendarPicker from './CalendarPicker';
 
 export const SERVING_OPTIONS: ServingOption[] = [
   { id: '1ml', value: 1, unit: 'ml', label: '1 ml' },
@@ -39,11 +41,14 @@ const DEFAULT_SERVING_ID = '100g';
 interface FoodFormProps {
   initialFood?: FoodItem;
   initialQuantity?: string;
-  onSave: (food: FoodItem, quantity: number) => Promise<void>;
+  initialDate?: Date;
+  onSave: (food: FoodItem, quantity: number, date?: Date) => Promise<void>;
   showQuantity?: boolean;
+  showDate?: boolean;
   buttonText?: string;
   onValidationError?: (message: string) => void;
   hideSaveButton?: boolean;
+  noPadding?: boolean;
 }
 
 export interface FoodFormRef {
@@ -53,11 +58,14 @@ export interface FoodFormRef {
 const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
   initialFood,
   initialQuantity = '1',
+  initialDate,
   onSave,
   showQuantity = true,
+  showDate = false,
   buttonText = 'Save Food',
   onValidationError,
   hideSaveButton = false,
+  noPadding = false,
 }, ref) => {
   const [foodName, setFoodName] = useState(initialFood?.name || '');
   const [protein, setProtein] = useState(initialFood?.macros.protein.toString() || '');
@@ -83,10 +91,13 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
     return DEFAULT_SERVING_ID;
   });
   const [quantity, setQuantity] = useState(initialQuantity);
+  const [selectedDate, setSelectedDate] = useState<Date>(initialDate || new Date());
+  const [calendarVisible, setCalendarVisible] = useState(false);
   const [servingPickerExpanded, setServingPickerExpanded] = useState(false);
   const [showProteinPicker, setShowProteinPicker] = useState(false);
   const [showCarbsPicker, setShowCarbsPicker] = useState(false);
   const [showFatPicker, setShowFatPicker] = useState(false);
+  const [showQuantityEditor, setShowQuantityEditor] = useState(false);
   const [tempProteinValue, setTempProteinValue] = useState(0);
   const [tempCarbsValue, setTempCarbsValue] = useState(0);
   const [tempFatValue, setTempFatValue] = useState(0);
@@ -205,15 +216,86 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
     };
 
     const qty = parseFloat(quantity) || 1;
-    await onSave(foodItem, qty);
+    const dateToUse = showDate ? selectedDate : undefined;
+    await onSave(foodItem, qty, dateToUse);
+  };
+
+  const isToday = (date: Date): boolean => {
+    const today = new Date();
+    return (
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    );
   };
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={noPadding ? styles.contentNoPadding : styles.content}
       scrollEnabled={!servingPickerExpanded}
     >
+      {showDate && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Date</Text>
+          <TouchableOpacity
+            onPress={() => setCalendarVisible(true)}
+            style={styles.dateButton}
+          >
+            <Text style={styles.dateButtonText}>
+              {isToday(selectedDate)
+                ? 'Today'
+                : selectedDate.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+            </Text>
+            <Ionicons name="calendar-outline" size={20} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={styles.section}>
+        {showQuantity ? (
+          <View style={styles.twoColumnRow}>
+            <View style={styles.column}>
+              <Text style={styles.columnLabel}>Serving Size</Text>
+              <ServingSizePicker
+                options={SERVING_OPTIONS}
+                selectedId={selectedServingId}
+                onSelect={setSelectedServingId}
+                onExpandedChange={setServingPickerExpanded}
+              />
+            </View>
+            <View style={styles.column}>
+              <Text style={styles.columnLabel}>Number of Servings</Text>
+              <TouchableOpacity
+                style={styles.inputButton}
+                onPress={() => setShowQuantityEditor(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.input, styles.inputButtonText]}>
+                  {parseFloat(quantity) || 1}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View>
+            <Text style={styles.columnLabel}>Serving Size</Text>
+            <ServingSizePicker
+              options={SERVING_OPTIONS}
+              selectedId={selectedServingId}
+              onSelect={setSelectedServingId}
+              onExpandedChange={setServingPickerExpanded}
+            />
+          </View>
+        )}
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.label}>Food Name *</Text>
         <TextInput
@@ -228,17 +310,12 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
         <Text style={styles.sectionTitle}>Macros (per serving)</Text>
 
         <View style={styles.macroRow}>
-          <Text style={styles.label}>Calories (auto)</Text>
-          <TextInput
-            style={styles.input}
-            value={caloriesText}
-            keyboardType="numeric"
-            editable={false}
-          />
+          <Text style={styles.macroLabel}>Calories (auto)</Text>
+          <Text style={styles.caloriesValue}>{caloriesText}</Text>
         </View>
 
         <View style={styles.macroRow}>
-          <Text style={styles.label}>Protein (g)</Text>
+          <Text style={styles.macroLabel}>Protein (g)</Text>
           <TouchableOpacity
             style={styles.inputButton}
             onPress={async () => {
@@ -256,7 +333,7 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
         </View>
 
         <View style={styles.macroRow}>
-          <Text style={styles.label}>Carbs (g)</Text>
+          <Text style={styles.macroLabel}>Carbs (g)</Text>
           <TouchableOpacity
             style={styles.inputButton}
             onPress={async () => {
@@ -274,7 +351,7 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
         </View>
 
         <View style={styles.macroRow}>
-          <Text style={styles.label}>Fat (g)</Text>
+          <Text style={styles.macroLabel}>Fat (g)</Text>
           <TouchableOpacity
             style={styles.inputButton}
             onPress={async () => {
@@ -291,29 +368,6 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
           </TouchableOpacity>
         </View>
       </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Serving Size</Text>
-        <ServingSizePicker
-          options={SERVING_OPTIONS}
-          selectedId={selectedServingId}
-          onSelect={setSelectedServingId}
-          onExpandedChange={setServingPickerExpanded}
-        />
-      </View>
-
-      {showQuantity && (
-        <View style={styles.section}>
-          <Text style={styles.label}>Quantity (servings)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="1"
-            value={quantity}
-            onChangeText={setQuantity}
-            keyboardType="numeric"
-          />
-        </View>
-      )}
 
       {!hideSaveButton && (
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
@@ -483,6 +537,32 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
           </View>
         </View>
       </Modal>
+
+      {/* Quantity Editor Modal */}
+      <NumberEditor
+        visible={showQuantityEditor}
+        value={parseFloat(quantity) || 1}
+        onSave={(value) => {
+          setQuantity(value.toString());
+          setShowQuantityEditor(false);
+        }}
+        onCancel={() => setShowQuantityEditor(false)}
+        min={0.1}
+        max={999}
+        title="Number of Servings"
+        unit="servings"
+        keyboardType="decimal-pad"
+        hideRange={true}
+      />
+
+      {showDate && (
+        <CalendarPicker
+          visible={calendarVisible}
+          selectedDate={selectedDate}
+          onDateSelect={setSelectedDate}
+          onClose={() => setCalendarVisible(false)}
+        />
+      )}
     </ScrollView>
   );
 });
@@ -494,6 +574,9 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
+  },
+  contentNoPadding: {
+    padding: 0,
   },
   section: {
     marginBottom: 24,
@@ -525,6 +608,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     backgroundColor: '#f9f9f9',
+    minWidth: 100,
   },
   inputButtonText: {
     flex: 1,
@@ -533,7 +617,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   macroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  macroLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+    flex: 1,
+  },
+  caloriesValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    textAlign: 'right',
+    minWidth: 100,
   },
   saveButton: {
     backgroundColor: '#007AFF',
@@ -611,6 +711,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  infoLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  quantityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#000',
+  },
+  twoColumnRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  column: {
+    flex: 1,
+  },
+  columnLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+    marginBottom: 8,
   },
 });
 

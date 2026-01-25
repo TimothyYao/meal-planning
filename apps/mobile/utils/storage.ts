@@ -373,6 +373,163 @@ export async function removeFoodFromToday(mealId: string, foodIndex: number): Pr
   return removeFoodFromDate(today, mealId, foodIndex);
 }
 
+// Move a food item from one date to another
+export async function moveFoodToDate(fromDate: string, toDate: string, mealId: string, foodIndex: number): Promise<void> {
+  try {
+    const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+    const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
+    
+    const fromDateLog = logs[fromDate];
+    if (!fromDateLog) return;
+    
+    // Find the meal and get the food at the specified index
+    const mealIndex = fromDateLog.meals.findIndex((m: any) => m.id === mealId);
+    if (mealIndex >= 0 && fromDateLog.meals[mealIndex].foods[foodIndex]) {
+      const mealFood = fromDateLog.meals[mealIndex].foods[foodIndex];
+      
+      // Remove from old date
+      fromDateLog.meals[mealIndex].foods.splice(foodIndex, 1);
+      
+      // Recalculate meal macros for old date
+      if (fromDateLog.meals[mealIndex].foods.length > 0) {
+        fromDateLog.meals[mealIndex].macros = calculateMacros(fromDateLog.meals[mealIndex].foods);
+      } else {
+        // Remove meal if it has no foods
+        fromDateLog.meals.splice(mealIndex, 1);
+      }
+      
+      // Recalculate total macros for old date
+      const allMealFoodsOld: MealFood[] = fromDateLog.meals.flatMap((meal: Meal) => meal.foods);
+      fromDateLog.totalMacros = calculateMacros(allMealFoodsOld);
+      
+      // Add to new date
+      let toDateLog = logs[toDate];
+      if (!toDateLog) {
+        toDateLog = {
+          date: toDate,
+          meals: [],
+          totalMacros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+          targetMacros: { calories: 2000, protein: 150, carbs: 200, fat: 65 },
+        };
+      }
+      
+      // Update addedAt timestamp
+      mealFood.addedAt = new Date();
+      
+      // Add to a default "Meal" or create a new meal
+      if (toDateLog.meals.length === 0) {
+        toDateLog.meals.push({
+          id: await generateFoodId(),
+          name: 'Meal',
+          foods: [mealFood],
+          timestamp: new Date(),
+          macros: calculateMacros([mealFood]),
+        });
+      } else {
+        // Add to the first meal
+        toDateLog.meals[0].foods.push(mealFood);
+        toDateLog.meals[0].macros = calculateMacros(toDateLog.meals[0].foods);
+      }
+      
+      // Recalculate total macros for new date
+      const allMealFoodsNew: MealFood[] = toDateLog.meals.flatMap((meal: Meal) => meal.foods);
+      toDateLog.totalMacros = calculateMacros(allMealFoodsNew);
+      
+      // Convert Date objects to ISO strings for storage
+      const logsToSave: Record<string, any> = {};
+      for (const date in logs) {
+        const log = logs[date];
+        logsToSave[date] = {
+          ...log,
+          meals: log.meals.map((meal: any) => ({
+            ...meal,
+            timestamp: meal.timestamp instanceof Date 
+              ? meal.timestamp.toISOString() 
+              : (typeof meal.timestamp === 'string' ? meal.timestamp : new Date().toISOString()),
+            foods: meal.foods.map((mealFood: any) => ({
+              ...mealFood,
+              addedAt: mealFood.addedAt instanceof Date 
+                ? mealFood.addedAt.toISOString() 
+                : (typeof mealFood.addedAt === 'string' ? mealFood.addedAt : (mealFood.addedAt ? new Date().toISOString() : undefined)),
+            })),
+          })),
+        };
+      }
+      
+      // Add new date log if it didn't exist
+      if (!logs[toDate]) {
+        logsToSave[toDate] = {
+          ...toDateLog,
+          meals: toDateLog.meals.map((meal: any) => ({
+            ...meal,
+            timestamp: meal.timestamp instanceof Date 
+              ? meal.timestamp.toISOString() 
+              : (typeof meal.timestamp === 'string' ? meal.timestamp : new Date().toISOString()),
+            foods: meal.foods.map((mealFood: any) => ({
+              ...mealFood,
+              addedAt: mealFood.addedAt instanceof Date 
+                ? mealFood.addedAt.toISOString() 
+                : (typeof mealFood.addedAt === 'string' ? mealFood.addedAt : (mealFood.addedAt ? new Date().toISOString() : undefined)),
+            })),
+          })),
+        };
+      }
+      
+      await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logsToSave));
+    }
+  } catch (error) {
+    console.error('Error moving food to date:', error);
+    throw error;
+  }
+}
+
+// Update the quantity of a food item in a specific date's log
+export async function updateFoodQuantityInDate(date: string, mealId: string, foodIndex: number, newQuantity: number): Promise<void> {
+  try {
+    const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+    const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
+    
+    const dateLog = logs[date];
+    if (!dateLog) return;
+    
+    // Find the meal and update the food quantity at the specified index
+    const mealIndex = dateLog.meals.findIndex((m: any) => m.id === mealId);
+    if (mealIndex >= 0 && dateLog.meals[mealIndex].foods[foodIndex]) {
+      dateLog.meals[mealIndex].foods[foodIndex].quantity = newQuantity;
+      
+      // Recalculate meal macros
+      dateLog.meals[mealIndex].macros = calculateMacros(dateLog.meals[mealIndex].foods);
+      
+      // Recalculate total macros for the day
+      const allMealFoods: MealFood[] = dateLog.meals.flatMap((meal: Meal) => meal.foods);
+      dateLog.totalMacros = calculateMacros(allMealFoods);
+      
+      // Convert Date objects to ISO strings for storage
+      const logToSave = {
+        ...dateLog,
+        meals: dateLog.meals.map((meal: any) => ({
+          ...meal,
+          timestamp: meal.timestamp instanceof Date 
+            ? meal.timestamp.toISOString() 
+            : (typeof meal.timestamp === 'string' ? meal.timestamp : new Date().toISOString()),
+          foods: meal.foods.map((mealFood: any) => ({
+            ...mealFood,
+            addedAt: mealFood.addedAt instanceof Date 
+              ? mealFood.addedAt.toISOString() 
+              : (typeof mealFood.addedAt === 'string' ? mealFood.addedAt : (mealFood.addedAt ? new Date().toISOString() : undefined)),
+          })),
+        })),
+      };
+      
+      logs[date] = logToSave;
+      await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
+    }
+  } catch (error) {
+    console.error('Error updating food quantity:', error);
+    throw error;
+  }
+}
+
 // Set target macros for today
 export async function setTodayTargetMacros(targets: MacroTargets): Promise<void> {
   try {

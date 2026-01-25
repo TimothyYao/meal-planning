@@ -10,6 +10,9 @@ type FoodDetailRouteParams = {
   foodId: string;
   quantity?: number;
   addedAt?: string; // ISO string
+  mealId?: string;
+  foodIndex?: number;
+  date?: string; // YYYY-MM-DD format
 };
 
 type FoodDetailRouteProp = RouteProp<{ FoodDetail: FoodDetailRouteParams }, 'FoodDetail'>;
@@ -18,9 +21,9 @@ export default function FoodDetailScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const route = useRoute<FoodDetailRouteProp>();
-  const { foodId, quantity: initialQuantity = 1, addedAt: addedAtString } = route.params;
+  const { foodId, quantity: initialQuantity = 1, addedAt: addedAtString, mealId, foodIndex, date } = route.params;
   const [food, setFood] = useState<FoodItem | null>(null);
-  const [quantity, setQuantity] = useState(initialQuantity);
+  const [quantity] = useState(initialQuantity);
   const [loading, setLoading] = useState(true);
   const addedAt = addedAtString ? new Date(addedAtString) : undefined;
 
@@ -63,12 +66,24 @@ export default function FoodDetailScreen() {
   const handleEdit = () => {
     if (!food) return;
     try {
-      // Navigate to EditFood screen in the same stack
-      (navigation as any).navigate('EditFood', { foodId: food.id });
+      // Navigate to EditFood screen with all necessary parameters
+      (navigation as any).navigate('EditFood', { 
+        foodId: food.id,
+        mealId,
+        foodIndex,
+        date,
+        quantity: initialQuantity,
+      });
     } catch (error) {
       console.error('Navigation error:', error);
       // Fallback: try using push
-      (navigation as any).push('EditFood', { foodId: food.id });
+      (navigation as any).push('EditFood', { 
+        foodId: food.id,
+        mealId,
+        foodIndex,
+        date,
+        quantity: initialQuantity,
+      });
     }
   };
 
@@ -152,6 +167,10 @@ export default function FoodDetailScreen() {
             <Text style={styles.infoValue}>
               {formatServingSize(food.servingSize, food.servingUnit)}
             </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Number of Servings</Text>
+            <Text style={styles.infoValue}>{formatNumber(quantity)}</Text>
           </View>
           {quantity !== 1 && (
             <View style={styles.infoRow}>

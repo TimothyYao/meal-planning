@@ -90,6 +90,8 @@ export default function FoodItem({
       ref={swipeableRef}
       renderRightActions={renderRightActions}
       rightThreshold={40}
+      overshootRight={false}
+      friction={2}
       onSwipeableOpen={() => {
         setIsOpen(true);
         if (onSwipeWillOpen && swipeableRef.current) {
@@ -223,7 +225,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   deleteContainer: {
-    flex: 1,
+    width: 100,
     justifyContent: 'center',
     alignItems: 'flex-end',
     backgroundColor: '#ff3b30',
