@@ -74,3 +74,13 @@ export function formatMacroValue(value: number, unit: 'calories' | 'grams'): str
   return `${Math.round(value * 10) / 10}g`;
 }
 
+/**
+ * Calculate total calories from macronutrients
+ * Protein: 4 calories per gram
+ * Carbs: 4 calories per gram
+ * Fat: 9 calories per gram
+ */
+export function calculateCaloriesFromMacros(protein: number, carbs: number, fat: number): number {
+  return protein * 4 + carbs * 4 + fat * 9;
+}
+
