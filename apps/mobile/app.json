@@ -1,5 +1,6 @@
 {
   "expo": {
+    "owner": "yaotime",
     "name": "mobile",
     "slug": "mobile",
     "version": "1.0.0",
@@ -14,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.mobile"
+      "bundleIdentifier": "com.mealplanning.mobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,6 +27,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "99541ecf-d6a2-4fca-b8e4-2f363f10314f"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/99541ecf-d6a2-4fca-b8e4-2f363f10314f"
     }
   }
 }

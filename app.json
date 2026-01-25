@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "ios": {
+      "bundleIdentifier": "com.yaotime.mealplanningmonorepo",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}
