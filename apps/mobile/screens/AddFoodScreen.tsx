@@ -1,10 +1,12 @@
 import { StyleSheet, Text, View, Alert, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { FoodItem } from '@meal-planning/shared';
-import { saveFood, addFoodToToday } from '../utils/storage';
+import { saveFood, addFoodToDate } from '../utils/storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
+import CalendarPicker from '../components/CalendarPicker';
 
 type AddFoodRouteParams = {
   duplicateFood?: FoodItem;
@@ -18,16 +20,37 @@ export default function AddFoodScreen() {
   const route = useRoute<AddFoodRouteProp>();
   const duplicateFood = route.params?.duplicateFood;
   const formRef = useRef<FoodFormRef>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [calendarVisible, setCalendarVisible] = useState(false);
+
+  // Format date to YYYY-MM-DD
+  const formatDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const isToday = (date: Date): boolean => {
+    const today = new Date();
+    return (
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    );
+  };
 
   const handleSave = async (foodItem: FoodItem, quantity: number) => {
     try {
       // Save food to database
       await saveFood(foodItem);
       
-      // Add to today's log
-      await addFoodToToday(foodItem, quantity);
+      // Add to selected date's log
+      const dateString = formatDateString(selectedDate);
+      await addFoodToDate(foodItem, quantity, dateString);
 
-      Alert.alert('Success', `Added ${foodItem.name} to today's log`, [
+      const dateLabel = isToday(selectedDate) ? "today's" : "the selected date's";
+      Alert.alert('Success', `Added ${foodItem.name} to ${dateLabel} log`, [
         {
           text: 'OK',
           onPress: () => {
@@ -68,6 +91,27 @@ export default function AddFoodScreen() {
         ]}
       >
         <Text style={styles.title}>Add Food</Text>
+        
+        <View style={styles.dateSection}>
+          <Text style={styles.dateLabel}>Date</Text>
+          <TouchableOpacity
+            onPress={() => setCalendarVisible(true)}
+            style={styles.dateButton}
+          >
+            <Text style={styles.dateButtonText}>
+              {isToday(selectedDate)
+                ? 'Today'
+                : selectedDate.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+            </Text>
+            <Ionicons name="calendar-outline" size={20} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
+
         <FoodForm
           ref={formRef}
           initialFood={duplicateFood}
@@ -77,6 +121,13 @@ export default function AddFoodScreen() {
           onValidationError={handleValidationError}
         />
       </ScrollView>
+
+      <CalendarPicker
+        visible={calendarVisible}
+        selectedDate={selectedDate}
+        onDateSelect={setSelectedDate}
+        onClose={() => setCalendarVisible(false)}
+      />
 
       <View style={[styles.bottomButtonContainer, { paddingBottom: insets.bottom + 20 }]}>
         <TouchableOpacity 
@@ -114,6 +165,29 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 20,
+  },
+  dateSection: {
+    marginBottom: 24,
+  },
+  dateLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 8,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e5ea',
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#000',
   },
   bottomButtonContainer: {
     position: 'absolute',

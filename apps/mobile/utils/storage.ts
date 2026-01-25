@@ -132,18 +132,17 @@ export async function getFoodById(foodId: string): Promise<FoodItem | null> {
   }
 }
 
-// Add a food to today's log
-export async function addFoodToToday(food: FoodItem, quantity: number = 1): Promise<void> {
+// Add a food to a specific date's log
+export async function addFoodToDate(food: FoodItem, quantity: number = 1, date: string): Promise<void> {
   try {
-    const today = getTodayDate();
     const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
     const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
     
-    // Get or create today's log
-    let todayLog = logs[today];
-    if (!todayLog) {
-      todayLog = {
-        date: today,
+    // Get or create the date's log
+    let dateLog = logs[date];
+    if (!dateLog) {
+      dateLog = {
+        date: date,
         meals: [],
         totalMacros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
         targetMacros: { calories: 2000, protein: 150, carbs: 200, fat: 65 }, // Default targets
@@ -160,8 +159,8 @@ export async function addFoodToToday(food: FoodItem, quantity: number = 1): Prom
     
     // Add to a default "Meal" or create a new meal
     // For simplicity, we'll add all foods to a single meal
-    if (todayLog.meals.length === 0) {
-      todayLog.meals.push({
+    if (dateLog.meals.length === 0) {
+      dateLog.meals.push({
         id: await generateFoodId(),
         name: 'Meal',
         foods: [mealFood],
@@ -170,18 +169,18 @@ export async function addFoodToToday(food: FoodItem, quantity: number = 1): Prom
       });
     } else {
       // Add to the first meal (or you could create separate meals)
-      todayLog.meals[0].foods.push(mealFood);
-      todayLog.meals[0].macros = calculateMacros(todayLog.meals[0].foods);
+      dateLog.meals[0].foods.push(mealFood);
+      dateLog.meals[0].macros = calculateMacros(dateLog.meals[0].foods);
     }
 
     // Recalculate total macros for the day
-    const allMealFoods: MealFood[] = todayLog.meals.flatMap((meal: Meal) => meal.foods);
-    todayLog.totalMacros = calculateMacros(allMealFoods);
+    const allMealFoods: MealFood[] = dateLog.meals.flatMap((meal: Meal) => meal.foods);
+    dateLog.totalMacros = calculateMacros(allMealFoods);
 
     // Convert Date objects to ISO strings for storage
     const logToSave = {
-      ...todayLog,
-      meals: todayLog.meals.map((meal: any) => ({
+      ...dateLog,
+      meals: dateLog.meals.map((meal: any) => ({
         ...meal,
         timestamp: meal.timestamp instanceof Date 
           ? meal.timestamp.toISOString() 
@@ -196,12 +195,18 @@ export async function addFoodToToday(food: FoodItem, quantity: number = 1): Prom
     };
     
     // Save updated log
-    logs[today] = logToSave;
+    logs[date] = logToSave;
     await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
   } catch (error) {
-    console.error('Error adding food to today:', error);
+    console.error('Error adding food to date:', error);
     throw error;
   }
+}
+
+// Add a food to today's log (convenience function)
+export async function addFoodToToday(food: FoodItem, quantity: number = 1): Promise<void> {
+  const today = getTodayDate();
+  return addFoodToDate(food, quantity, today);
 }
 
 // Get today's log
@@ -310,37 +315,36 @@ export async function reorderFoodsInMeal(mealId: string, fromIndex: number, toIn
   }
 }
 
-// Remove a food from today's log
-export async function removeFoodFromToday(mealId: string, foodIndex: number): Promise<void> {
+// Remove a food from a specific date's log
+export async function removeFoodFromDate(date: string, mealId: string, foodIndex: number): Promise<void> {
   try {
-    const today = getTodayDate();
     const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
     const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
     
-    const todayLog = logs[today];
-    if (!todayLog) return;
+    const dateLog = logs[date];
+    if (!dateLog) return;
     
     // Find the meal and remove the food at the specified index
-    const mealIndex = todayLog.meals.findIndex((m: any) => m.id === mealId);
-    if (mealIndex >= 0 && todayLog.meals[mealIndex].foods[foodIndex]) {
-      todayLog.meals[mealIndex].foods.splice(foodIndex, 1);
+    const mealIndex = dateLog.meals.findIndex((m: any) => m.id === mealId);
+    if (mealIndex >= 0 && dateLog.meals[mealIndex].foods[foodIndex]) {
+      dateLog.meals[mealIndex].foods.splice(foodIndex, 1);
       
       // Recalculate meal macros
-      if (todayLog.meals[mealIndex].foods.length > 0) {
-        todayLog.meals[mealIndex].macros = calculateMacros(todayLog.meals[mealIndex].foods);
+      if (dateLog.meals[mealIndex].foods.length > 0) {
+        dateLog.meals[mealIndex].macros = calculateMacros(dateLog.meals[mealIndex].foods);
       } else {
         // Remove meal if it has no foods
-        todayLog.meals.splice(mealIndex, 1);
+        dateLog.meals.splice(mealIndex, 1);
       }
       
       // Recalculate total macros for the day
-      const allMealFoods: MealFood[] = todayLog.meals.flatMap((meal: any) => meal.foods);
-      todayLog.totalMacros = calculateMacros(allMealFoods);
+      const allMealFoods: MealFood[] = dateLog.meals.flatMap((meal: any) => meal.foods);
+      dateLog.totalMacros = calculateMacros(allMealFoods);
       
       // Convert Date objects to ISO strings for storage
       const logToSave = {
-        ...todayLog,
-        meals: todayLog.meals.map((meal: any) => ({
+        ...dateLog,
+        meals: dateLog.meals.map((meal: any) => ({
           ...meal,
           timestamp: meal.timestamp instanceof Date 
             ? meal.timestamp.toISOString() 
@@ -354,13 +358,19 @@ export async function removeFoodFromToday(mealId: string, foodIndex: number): Pr
         })),
       };
       
-      logs[today] = logToSave;
+      logs[date] = logToSave;
       await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
     }
   } catch (error) {
-    console.error('Error removing food from today:', error);
+    console.error('Error removing food from date:', error);
     throw error;
   }
+}
+
+// Remove a food from today's log (convenience function)
+export async function removeFoodFromToday(mealId: string, foodIndex: number): Promise<void> {
+  const today = getTodayDate();
+  return removeFoodFromDate(today, mealId, foodIndex);
 }
 
 // Set target macros for today

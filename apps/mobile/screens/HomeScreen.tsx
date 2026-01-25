@@ -3,15 +3,19 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Animated }
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Swipeable } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
 import { DailyLog, formatMacroValue, MealFood } from '@meal-planning/shared';
-import { getTodayLog, removeFoodFromToday } from '../utils/storage';
+import { getLogForDate, removeFoodFromDate } from '../utils/storage';
 import FoodItem from '../components/FoodItem';
+import CalendarPicker from '../components/CalendarPicker';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const [todayLog, setTodayLog] = useState<DailyLog | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDateLog, setSelectedDateLog] = useState<DailyLog | null>(null);
   const [loading, setLoading] = useState(true);
+  const [calendarVisible, setCalendarVisible] = useState(false);
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
   const currentOpenSwipeable = useRef<Swipeable | null>(null);
   
@@ -21,23 +25,61 @@ export default function HomeScreen() {
   const carbsProgress = useRef(new Animated.Value(0)).current;
   const fatProgress = useRef(new Animated.Value(0)).current;
 
+  // Format date to YYYY-MM-DD
+  const formatDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   useEffect(() => {
-    loadTodayLog();
+    loadDateLog();
     
     // Refresh when screen comes into focus
-    const interval = setInterval(loadTodayLog, 2000); // Refresh every 2 seconds
+    const interval = setInterval(loadDateLog, 2000); // Refresh every 2 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedDate]);
 
-  const loadTodayLog = async () => {
+  const loadDateLog = async () => {
     try {
-      const log = await getTodayLog();
-      setTodayLog(log);
+      const dateString = formatDateString(selectedDate);
+      const log = await getLogForDate(dateString);
+      setSelectedDateLog(log);
     } catch (error) {
-      console.error('Error loading today log:', error);
+      console.error('Error loading date log:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const isToday = (date: Date): boolean => {
+    const today = new Date();
+    return (
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    );
+  };
+
+  const goToPreviousDay = () => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() - 1);
+    setSelectedDate(newDate);
+  };
+
+  const goToNextDay = () => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() + 1);
+    setSelectedDate(newDate);
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date());
+  };
+
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date);
   };
 
   const handleSwipeWillOpen = (swipeable: Swipeable) => {
@@ -63,9 +105,10 @@ export default function HomeScreen() {
     });
     swipeableRefs.current.clear();
 
+    const dateLabel = isToday(selectedDate) ? "today's" : "this day's";
     Alert.alert(
       'Remove Food',
-      `Remove ${foodName} from today's log?`,
+      `Remove ${foodName} from ${dateLabel} log?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -73,8 +116,9 @@ export default function HomeScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await removeFoodFromToday(mealId, foodIndex);
-              await loadTodayLog(); // Refresh the log
+              const dateString = formatDateString(selectedDate);
+              await removeFoodFromDate(dateString, mealId, foodIndex);
+              await loadDateLog(); // Refresh the log
             } catch (error) {
               console.error('Error removing food:', error);
               Alert.alert('Error', 'Failed to remove food. Please try again.');
@@ -85,14 +129,14 @@ export default function HomeScreen() {
     );
   };
 
-  const targetMacros = todayLog?.targetMacros || {
+  const targetMacros = selectedDateLog?.targetMacros || {
     calories: 2000,
     protein: 150,
     carbs: 200,
     fat: 65,
   };
 
-  const totalMacros = todayLog?.totalMacros || {
+  const totalMacros = selectedDateLog?.totalMacros || {
     calories: 0,
     protein: 0,
     carbs: 0,
@@ -106,7 +150,7 @@ export default function HomeScreen() {
 
   // Animate progress bars when macros change
   useEffect(() => {
-    if (!todayLog) {
+    if (!selectedDateLog) {
       // Reset to 0 if no log
       caloriesProgress.setValue(0);
       proteinProgress.setValue(0);
@@ -115,14 +159,14 @@ export default function HomeScreen() {
       return;
     }
     
-    const targetMacros = todayLog.targetMacros || {
+    const targetMacros = selectedDateLog.targetMacros || {
       calories: 2000,
       protein: 150,
       carbs: 200,
       fat: 65,
     };
     
-    const totalMacros = todayLog.totalMacros || {
+    const totalMacros = selectedDateLog.totalMacros || {
       calories: 0,
       protein: 0,
       carbs: 0,
@@ -141,7 +185,7 @@ export default function HomeScreen() {
     animateProgress(proteinProgress, getProgress(totalMacros.protein, targetMacros.protein));
     animateProgress(carbsProgress, getProgress(totalMacros.carbs, targetMacros.carbs));
     animateProgress(fatProgress, getProgress(totalMacros.fat, targetMacros.fat));
-  }, [todayLog]);
+  }, [selectedDateLog]);
 
   const formatNumber = (value: number) => {
     const rounded = Math.round(value * 10) / 10;
@@ -187,18 +231,48 @@ export default function HomeScreen() {
       }}
       onScrollBeginDrag={handleScrollViewPress}
     >
-      <Text style={styles.title}>Today's Macros</Text>
+      <Text style={styles.title}>
+        {isToday(selectedDate) ? "Today's Macros" : "Macros"}
+      </Text>
       
       <View style={styles.dateContainer}>
-        <Text style={styles.dateText}>
-          {new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </Text>
+        <TouchableOpacity
+          onPress={goToPreviousDay}
+          style={styles.dateNavButton}
+        >
+          <Ionicons name="chevron-back" size={24} color="#007AFF" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          onPress={() => setCalendarVisible(true)}
+          style={styles.dateTextContainer}
+        >
+          <Text style={styles.dateText}>
+            {isToday(selectedDate)
+              ? 'Today'
+              : selectedDate.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          onPress={goToNextDay}
+          style={styles.dateNavButton}
+        >
+          <Ionicons name="chevron-forward" size={24} color="#007AFF" />
+        </TouchableOpacity>
       </View>
+
+      <CalendarPicker
+        visible={calendarVisible}
+        selectedDate={selectedDate}
+        onDateSelect={handleDateSelect}
+        onClose={() => setCalendarVisible(false)}
+      />
 
       {loading ? (
         <Text style={styles.loadingText}>Loading...</Text>
@@ -334,10 +408,12 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {todayLog && todayLog.meals.length > 0 && (
+          {selectedDateLog && selectedDateLog.meals.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Today's Foods</Text>
-              {todayLog.meals.map(meal =>
+              <Text style={styles.sectionTitle}>
+                {isToday(selectedDate) ? "Today's Foods" : "Foods"}
+              </Text>
+              {selectedDateLog.meals.map(meal =>
                 meal.foods.map((mealFood, index) => {
                   const itemKey = `${meal.id}-${mealFood.food.id}-${index}`;
                   return (
@@ -400,11 +476,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 24,
+  },
+  dateNavButton: {
+    padding: 8,
+  },
+  dateTextContainer: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 12,
   },
   dateText: {
     fontSize: 16,
     color: '#666',
+    textAlign: 'center',
   },
   loadingText: {
     fontSize: 16,
