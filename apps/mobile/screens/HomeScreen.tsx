@@ -1,12 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { DailyLog, formatMacroValue } from '@meal-planning/shared';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { Swipeable } from 'react-native-gesture-handler';
+import { DailyLog, formatMacroValue, MealFood } from '@meal-planning/shared';
 import { getTodayLog, removeFoodFromToday } from '../utils/storage';
+import FoodItem from '../components/FoodItem';
 
 export default function HomeScreen() {
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [todayLog, setTodayLog] = useState<DailyLog | null>(null);
   const [loading, setLoading] = useState(true);
+  const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
+  const currentOpenSwipeable = useRef<Swipeable | null>(null);
 
   useEffect(() => {
     loadTodayLog();
@@ -27,7 +34,29 @@ export default function HomeScreen() {
     }
   };
 
+  const handleSwipeWillOpen = (swipeable: Swipeable) => {
+    // Close the currently open Swipeable if there is one
+    if (currentOpenSwipeable.current && currentOpenSwipeable.current !== swipeable) {
+      currentOpenSwipeable.current.close();
+    }
+    currentOpenSwipeable.current = swipeable;
+  };
+
+  const handleSwipeClose = () => {
+    currentOpenSwipeable.current = null;
+  };
+
   const handleRemoveFood = async (mealId: string, foodIndex: number, foodName: string) => {
+    // Close all open Swipeables
+    if (currentOpenSwipeable.current) {
+      currentOpenSwipeable.current.close();
+      currentOpenSwipeable.current = null;
+    }
+    swipeableRefs.current.forEach((swipeable) => {
+      swipeable.close();
+    });
+    swipeableRefs.current.clear();
+
     Alert.alert(
       'Remove Food',
       `Remove ${foodName} from today's log?`,
@@ -85,12 +114,34 @@ export default function HomeScreen() {
     return `${qtyText} ${label} • ${formatServingSize(servingSize, servingUnit)}`;
   };
 
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
   const calculateCaloriesFromMacros = (macros: { protein: number; carbs: number; fat: number }) => {
     return macros.protein * 4 + macros.carbs * 4 + macros.fat * 9;
   };
 
+  const handleScrollViewPress = () => {
+    if (currentOpenSwipeable.current) {
+      currentOpenSwipeable.current.close();
+      currentOpenSwipeable.current = null;
+    }
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView 
+      style={styles.container} 
+      contentContainerStyle={[styles.content, { paddingTop: insets.top }]}
+      onStartShouldSetResponder={() => {
+        handleScrollViewPress();
+        return false;
+      }}
+      onScrollBeginDrag={handleScrollViewPress}
+    >
       <Text style={styles.title}>Today's Macros</Text>
       
       <View style={styles.dateContainer}>
@@ -230,34 +281,45 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Today's Foods</Text>
               {todayLog.meals.map(meal =>
-                meal.foods.map((mealFood, index) => (
-                  <View key={`${meal.id}-${index}`} style={styles.foodItem}>
-                    <View style={styles.foodInfo}>
-                      <View style={styles.foodDetails}>
-                        <Text style={styles.foodName}>{mealFood.food.name}</Text>
-                        <Text style={styles.foodServing}>
-                          {formatServingInfo(
-                            mealFood.quantity,
-                            mealFood.food.servingSize,
-                            mealFood.food.servingUnit
-                          )}
-                        </Text>
-                      </View>
-                      <Text style={styles.foodMacros}>
-                        {formatMacroValue(
-                          calculateCaloriesFromMacros(mealFood.food.macros) * mealFood.quantity,
-                          'calories'
-                        )}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => handleRemoveFood(meal.id, index, mealFood.food.name)}
-                    >
-                      <Ionicons name="trash-outline" size={20} color="#ff3b30" />
-                    </TouchableOpacity>
-                  </View>
-                ))
+                meal.foods.map((mealFood, index) => {
+                  const itemKey = `${meal.id}-${mealFood.food.id}-${index}`;
+                  return (
+                    <FoodItem
+                      key={itemKey}
+                      mealFood={mealFood}
+                      mealId={meal.id}
+                      index={index}
+                      totalItems={meal.foods.length}
+                      onPress={() => {
+                        // If any swipeable is open, close it instead of navigating
+                        if (currentOpenSwipeable.current) {
+                          currentOpenSwipeable.current.close();
+                          currentOpenSwipeable.current = null;
+                          return;
+                        }
+                        // Otherwise navigate normally
+                        (navigation as any).navigate('FoodDetail', {
+                          food: mealFood.food,
+                          quantity: mealFood.quantity,
+                          addedAt: mealFood.addedAt ? mealFood.addedAt.toISOString() : undefined,
+                        });
+                      }}
+                      onRemove={() => handleRemoveFood(meal.id, index, mealFood.food.name)}
+                      onSwipeableRef={(ref) => {
+                        if (ref) {
+                          swipeableRefs.current.set(itemKey, ref);
+                        } else {
+                          swipeableRefs.current.delete(itemKey);
+                        }
+                      }}
+                      onSwipeWillOpen={handleSwipeWillOpen}
+                      onSwipeClose={handleSwipeClose}
+                      formatServingInfo={formatServingInfo}
+                      formatTime={formatTime}
+                      calculateCaloriesFromMacros={calculateCaloriesFromMacros}
+                    />
+                  );
+                })
               )}
             </View>
           )}
@@ -367,41 +429,5 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#34c759',
     borderRadius: 3,
-  },
-  foodItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  foodInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  foodDetails: {
-    flex: 1,
-    marginRight: 12,
-  },
-  foodName: {
-    fontSize: 16,
-    flex: 1,
-  },
-  foodServing: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  foodMacros: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#007AFF',
-  },
-  deleteButton: {
-    padding: 8,
-    borderRadius: 8,
   },
 });

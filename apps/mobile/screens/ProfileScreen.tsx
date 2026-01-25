@@ -8,11 +8,13 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile, MacroTargets, formatMacroValue } from '@meal-planning/shared';
 import { getTodayLog, setTodayTargetMacros } from '../utils/storage';
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   // Example profile data - in a real app, this would come from state/storage
   const profile: UserProfile = {
     id: '1',
@@ -106,7 +108,10 @@ export default function ProfileScreen() {
     : null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView 
+      style={styles.container} 
+      contentContainerStyle={[styles.content, { paddingTop: insets.top }]}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Profile</Text>
         <Text style={styles.name}>{profile.name}</Text>

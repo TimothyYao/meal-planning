@@ -29,6 +29,7 @@ export interface MealFood {
   foodId: string;
   food: FoodItem;
   quantity: number; // multiplier of servingSize
+  addedAt?: Date; // timestamp when food was added to the meal
 }
 
 export interface DailyLog {

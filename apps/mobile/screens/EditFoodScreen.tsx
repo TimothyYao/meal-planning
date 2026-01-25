@@ -3,31 +3,26 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useRef } from 'react';
 import { FoodItem } from '@meal-planning/shared';
-import { saveFood, addFoodToToday } from '../utils/storage';
+import { saveFood } from '../utils/storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
 
-type AddFoodRouteParams = {
-  duplicateFood?: FoodItem;
+type EditFoodRouteParams = {
+  food: FoodItem;
 };
 
-type AddFoodRouteProp = RouteProp<{ AddFood: AddFoodRouteParams }, 'AddFood'>;
+type EditFoodRouteProp = RouteProp<{ EditFood: EditFoodRouteParams }, 'EditFood'>;
 
-export default function AddFoodScreen() {
+export default function EditFoodScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const route = useRoute<AddFoodRouteProp>();
-  const duplicateFood = route.params?.duplicateFood;
+  const route = useRoute<EditFoodRouteProp>();
+  const { food } = route.params;
   const formRef = useRef<FoodFormRef>(null);
 
-  const handleSave = async (foodItem: FoodItem, quantity: number) => {
+  const handleSave = async (editedFood: FoodItem, quantity: number) => {
     try {
-      // Save food to database
-      await saveFood(foodItem);
-      
-      // Add to today's log
-      await addFoodToToday(foodItem, quantity);
-
-      Alert.alert('Success', `Added ${foodItem.name} to today's log`, [
+      await saveFood(editedFood);
+      Alert.alert('Success', `Updated ${editedFood.name}`, [
         {
           text: 'OK',
           onPress: () => {
@@ -36,8 +31,8 @@ export default function AddFoodScreen() {
         },
       ]);
     } catch (error) {
-      console.error('Error saving food:', error);
-      Alert.alert('Error', 'Failed to save food. Please try again.');
+      console.error('Error updating food:', error);
+      Alert.alert('Error', 'Failed to update food. Please try again.');
     }
   };
 
@@ -67,12 +62,12 @@ export default function AddFoodScreen() {
           }
         ]}
       >
-        <Text style={styles.title}>Add Food</Text>
+        <Text style={styles.title}>Edit Food</Text>
         <FoodForm
           ref={formRef}
-          initialFood={duplicateFood}
+          initialFood={food}
           onSave={handleSave}
-          showQuantity={true}
+          showQuantity={false}
           hideSaveButton={true}
           onValidationError={handleValidationError}
         />

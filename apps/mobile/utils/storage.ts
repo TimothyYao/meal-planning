@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 import { DailyLog, MealFood, FoodItem, MacroTargets, calculateMacros, Meal } from '@meal-planning/shared';
 
 const DAILY_LOGS_KEY = '@meal_planning:daily_logs';
@@ -6,6 +7,11 @@ const FOODS_KEY = '@meal_planning:foods';
 const LAST_PROTEIN_KEY = '@meal_planning:last_protein';
 const LAST_CARBS_KEY = '@meal_planning:last_carbs';
 const LAST_FAT_KEY = '@meal_planning:last_fat';
+
+// Generate a UUID for food items
+export async function generateFoodId(): Promise<string> {
+  return await Crypto.randomUUID();
+}
 
 // Get today's date in YYYY-MM-DD format
 export function getTodayDate(): string {
@@ -68,13 +74,14 @@ export async function addFoodToToday(food: FoodItem, quantity: number = 1): Prom
       foodId: food.id,
       food,
       quantity,
+      addedAt: new Date(),
     };
     
     // Add to a default "Meal" or create a new meal
     // For simplicity, we'll add all foods to a single meal
     if (todayLog.meals.length === 0) {
       todayLog.meals.push({
-        id: `meal-${Date.now()}`,
+        id: await generateFoodId(),
         name: 'Meal',
         foods: [mealFood],
         timestamp: new Date(),
@@ -98,6 +105,12 @@ export async function addFoodToToday(food: FoodItem, quantity: number = 1): Prom
         timestamp: meal.timestamp instanceof Date 
           ? meal.timestamp.toISOString() 
           : (typeof meal.timestamp === 'string' ? meal.timestamp : new Date().toISOString()),
+        foods: meal.foods.map((mealFood: any) => ({
+          ...mealFood,
+          addedAt: mealFood.addedAt instanceof Date 
+            ? mealFood.addedAt.toISOString() 
+            : (typeof mealFood.addedAt === 'string' ? mealFood.addedAt : new Date().toISOString()),
+        })),
       })),
     };
     
@@ -125,6 +138,10 @@ export async function getTodayLog(): Promise<DailyLog | null> {
       meals: log.meals.map((meal: any) => ({
         ...meal,
         timestamp: new Date(meal.timestamp),
+        foods: meal.foods.map((mealFood: any) => ({
+          ...mealFood,
+          addedAt: mealFood.addedAt ? new Date(mealFood.addedAt) : undefined,
+        })),
       })),
     };
     
@@ -149,6 +166,10 @@ export async function getLogForDate(date: string): Promise<DailyLog | null> {
       meals: log.meals.map((meal: any) => ({
         ...meal,
         timestamp: new Date(meal.timestamp),
+        foods: meal.foods.map((mealFood: any) => ({
+          ...mealFood,
+          addedAt: mealFood.addedAt ? new Date(mealFood.addedAt) : undefined,
+        })),
       })),
     };
     
@@ -156,6 +177,55 @@ export async function getLogForDate(date: string): Promise<DailyLog | null> {
   } catch (error) {
     console.error('Error getting log for date:', error);
     return null;
+  }
+}
+
+// Reorder foods in a meal
+export async function reorderFoodsInMeal(mealId: string, fromIndex: number, toIndex: number): Promise<void> {
+  try {
+    const today = getTodayDate();
+    const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+    const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
+    
+    const todayLog = logs[today];
+    if (!todayLog) return;
+    
+    const mealIndex = todayLog.meals.findIndex((m: any) => m.id === mealId);
+    if (mealIndex >= 0 && todayLog.meals[mealIndex].foods[fromIndex] && todayLog.meals[mealIndex].foods[toIndex] !== undefined) {
+      const meal = todayLog.meals[mealIndex];
+      const [movedFood] = meal.foods.splice(fromIndex, 1);
+      meal.foods.splice(toIndex, 0, movedFood);
+      
+      // Recalculate meal macros
+      meal.macros = calculateMacros(meal.foods);
+      
+      // Recalculate total macros for the day
+      const allMealFoods: MealFood[] = todayLog.meals.flatMap((meal: any) => meal.foods);
+      todayLog.totalMacros = calculateMacros(allMealFoods);
+      
+      // Convert Date objects to ISO strings for storage
+      const logToSave = {
+        ...todayLog,
+        meals: todayLog.meals.map((meal: any) => ({
+          ...meal,
+          timestamp: meal.timestamp instanceof Date 
+            ? meal.timestamp.toISOString() 
+            : (typeof meal.timestamp === 'string' ? meal.timestamp : new Date().toISOString()),
+          foods: meal.foods.map((mealFood: any) => ({
+            ...mealFood,
+            addedAt: mealFood.addedAt instanceof Date 
+              ? mealFood.addedAt.toISOString() 
+              : (typeof mealFood.addedAt === 'string' ? mealFood.addedAt : (mealFood.addedAt ? new Date().toISOString() : undefined)),
+          })),
+        })),
+      };
+      
+      logs[today] = logToSave;
+      await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
+    }
+  } catch (error) {
+    console.error('Error reordering foods:', error);
+    throw error;
   }
 }
 
@@ -194,6 +264,12 @@ export async function removeFoodFromToday(mealId: string, foodIndex: number): Pr
           timestamp: meal.timestamp instanceof Date 
             ? meal.timestamp.toISOString() 
             : (typeof meal.timestamp === 'string' ? meal.timestamp : new Date().toISOString()),
+          foods: meal.foods.map((mealFood: any) => ({
+            ...mealFood,
+            addedAt: mealFood.addedAt instanceof Date 
+              ? mealFood.addedAt.toISOString() 
+              : (typeof mealFood.addedAt === 'string' ? mealFood.addedAt : (mealFood.addedAt ? new Date().toISOString() : undefined)),
+          })),
         })),
       };
       
