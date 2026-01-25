@@ -17,6 +17,8 @@ type ServingSizePickerProps = {
   onExpandedChange: (expanded: boolean) => void;
 };
 
+const LONG_PRESS_MS = 600;
+
 export function ServingSizePicker({
   options,
   selectedId,
@@ -30,11 +32,22 @@ export function ServingSizePicker({
     {}
   );
   const selectionLock = useRef(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const slideMode = useRef(false);
 
   const selectedOption = options.find((option) => option.id === selectedId);
   const selectedLabel = selectedOption?.label ?? 'Select';
 
+  const clearLongPressTimer = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   const closePicker = () => {
+    clearLongPressTimer();
+    slideMode.current = false;
     setIsExpanded(false);
     onExpandedChange(false);
     setHoveredId(null);
@@ -59,6 +72,10 @@ export function ServingSizePicker({
       chipLayouts.current = {};
     }
   }, [isExpanded]);
+
+  useEffect(() => {
+    return () => clearLongPressTimer();
+  }, []);
 
   const getHoveredId = (x: number, y: number) => {
     const entries = Object.entries(chipLayouts.current);
@@ -100,19 +117,36 @@ export function ServingSizePicker({
       <Pressable
         style={[styles.selectedChipButton, styles.chipSelected]}
         onPressIn={() => {
-          setIsExpanded(true);
-          onExpandedChange(true);
+          slideMode.current = false;
+          clearLongPressTimer();
           setHoveredId(null);
+          longPressTimer.current = setTimeout(() => {
+            longPressTimer.current = null;
+            slideMode.current = true;
+            setIsExpanded(true);
+            onExpandedChange(true);
+          }, LONG_PRESS_MS);
+        }}
+        onPress={() => {
+          // Short press: open on release if modal hasn't opened yet
+          clearLongPressTimer();
+          if (!isExpanded) {
+            setIsExpanded(true);
+            onExpandedChange(true);
+          }
         }}
         pressRetentionOffset={{ top: 1000, bottom: 1000, left: 1000, right: 1000 }}
         onTouchEnd={(event) => {
+          clearLongPressTimer();
           if (!isExpanded) {
             return;
           }
-          finalizeSelectionAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
+          if (slideMode.current) {
+            finalizeSelectionAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
+          }
         }}
         onTouchMove={(event) => {
-          if (!isExpanded) {
+          if (!isExpanded || !slideMode.current) {
             return;
           }
           handleTouchAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
@@ -129,20 +163,7 @@ export function ServingSizePicker({
         onRequestClose={closePicker}
       >
         <Pressable style={styles.modalOverlay} onPress={closePicker}>
-          <Pressable
-            style={styles.modalSheet}
-            onPress={(event) => event.stopPropagation()}
-            onTouchStart={(event) => {
-              handleTouchAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
-            }}
-            onTouchMove={(event) => {
-              handleTouchAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
-            }}
-            onTouchEnd={(event) => {
-              finalizeSelectionAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
-            }}
-            onTouchCancel={closePicker}
-          >
+          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Serving Size</Text>
               <TouchableOpacity onPress={closePicker}>
@@ -163,12 +184,13 @@ export function ServingSizePicker({
                     style={styles.chipWrapper}
                     onLayout={() => measureChip(option.id)}
                   >
-                    <View
+                    <Pressable
                       style={[
                         styles.chip,
                         isSelected && styles.chipSelected,
                         isHovered && styles.chipHovered,
                       ]}
+                      onPress={() => handleSelect(option.id)}
                     >
                       <Text
                         style={[
@@ -178,12 +200,11 @@ export function ServingSizePicker({
                       >
                         {option.label}
                       </Text>
-                    </View>
+                    </Pressable>
                   </View>
                 );
               })}
             </View>
-
           </Pressable>
         </Pressable>
       </Modal>

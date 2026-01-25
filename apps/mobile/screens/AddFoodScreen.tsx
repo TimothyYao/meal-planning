@@ -30,9 +30,9 @@ const SERVING_OPTIONS: ServingOption[] = [
   { id: '1tsp', value: 5, unit: 'ml', label: '1 tsp (5 ml)' },
   { id: '1tbsp', value: 15, unit: 'ml', label: '1 tbsp (15 ml)' },
   { id: '100ml', value: 100, unit: 'ml', label: '100 ml' },
-  { id: '1piece', value: 1, unit: 'piece', label: '1 piece' },
-  { id: '1cup', value: 240, unit: 'ml', label: '1 cup (240 ml)' },
   { id: '1serving', value: 1, unit: 'serving', label: '1 serving' },
+  { id: '1cup', value: 240, unit: 'ml', label: '1 cup (240 ml)' },
+  { id: '1g', value: 1, unit: 'g', label: '1 g' },
   { id: '100g', value: 100, unit: 'g', label: '100 g' },
 ];
 
@@ -169,7 +169,6 @@ export default function AddFoodScreen() {
           <Text style={styles.label}>Calories (auto)</Text>
           <TextInput
             style={styles.input}
-            placeholder="0"
             value={caloriesText}
             keyboardType="numeric"
             editable={false}

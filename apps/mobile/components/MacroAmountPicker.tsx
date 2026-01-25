@@ -6,11 +6,9 @@ import {
   TouchableOpacity,
   PanResponder,
   Dimensions,
-  Modal,
-  TextInput,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { NumberEditor } from './NumberEditor';
 
 type MacroAmountPickerProps = {
   value: number;
@@ -42,7 +40,6 @@ export function MacroAmountPicker({
 }: MacroAmountPickerProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editValue, setEditValue] = useState('');
   const sliderContainerRef = useRef<View>(null);
   const sliderTrackRef = useRef<View>(null);
   const sliderLayout = useRef({ x: 0, width: 0 });
@@ -120,20 +117,7 @@ export function MacroAmountPicker({
   };
 
   const handleEditPress = () => {
-    setEditValue(value.toString());
     setShowEditModal(true);
-  };
-
-  const handleEditSave = () => {
-    const numValue = parseFloat(editValue);
-    if (isNaN(numValue)) {
-      Alert.alert('Invalid Input', 'Please enter a valid number');
-      return;
-    }
-    const clampedValue = Math.max(min, Math.min(max, numValue));
-    // Preserve decimal value from precise input
-    onChange(clampedValue);
-    setShowEditModal(false);
   };
 
   // Format display value: show integer unless it has decimals
@@ -148,7 +132,6 @@ export function MacroAmountPicker({
 
   const handleEditCancel = () => {
     setShowEditModal(false);
-    setEditValue('');
   };
 
   // Quick select buttons for common values
@@ -306,42 +289,16 @@ export function MacroAmountPicker({
         </View>
       </View>
 
-      {/* Edit Modal */}
-      <Modal
+      <NumberEditor
         visible={showEditModal}
-        transparent
-        animationType="fade"
-        onRequestClose={handleEditCancel}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Enter Value</Text>
-            <TextInput
-              style={styles.editInput}
-              value={editValue}
-              onChangeText={setEditValue}
-              keyboardType="decimal-pad"
-              placeholder={`${min} - ${max}`}
-              autoFocus
-              selectTextOnFocus
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={handleEditCancel}
-              >
-                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSave]}
-                onPress={handleEditSave}
-              >
-                <Text style={styles.modalButtonTextSave}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        value={value}
+        onSave={(v) => onChange(v)}
+        onCancel={handleEditCancel}
+        min={min}
+        max={max}
+        title="Enter Value"
+        unit="g"
+      />
     </View>
   );
 }
@@ -508,64 +465,5 @@ const styles = StyleSheet.create({
   lastSavedIcon: {
     marginLeft: 4,
     marginTop: 2,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 16,
-    textAlign: 'center',
-    color: '#333',
-  },
-  editInput: {
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 24,
-    textAlign: 'center',
-    backgroundColor: '#f9f9f9',
-    marginBottom: 20,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  modalButtonSave: {
-    backgroundColor: '#007AFF',
-  },
-  modalButtonTextCancel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-  },
-  modalButtonTextSave: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
   },
 });
