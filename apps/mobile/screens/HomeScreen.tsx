@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -14,6 +14,12 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
   const currentOpenSwipeable = useRef<Swipeable | null>(null);
+  
+  // Animated values for progress bars
+  const caloriesProgress = useRef(new Animated.Value(0)).current;
+  const proteinProgress = useRef(new Animated.Value(0)).current;
+  const carbsProgress = useRef(new Animated.Value(0)).current;
+  const fatProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadTodayLog();
@@ -98,6 +104,45 @@ export default function HomeScreen() {
     return Math.min((current / target) * 100, 100);
   };
 
+  // Animate progress bars when macros change
+  useEffect(() => {
+    if (!todayLog) {
+      // Reset to 0 if no log
+      caloriesProgress.setValue(0);
+      proteinProgress.setValue(0);
+      carbsProgress.setValue(0);
+      fatProgress.setValue(0);
+      return;
+    }
+    
+    const targetMacros = todayLog.targetMacros || {
+      calories: 2000,
+      protein: 150,
+      carbs: 200,
+      fat: 65,
+    };
+    
+    const totalMacros = todayLog.totalMacros || {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+    };
+    
+    const animateProgress = (animatedValue: Animated.Value, progress: number) => {
+      Animated.timing(animatedValue, {
+        toValue: progress,
+        duration: 500,
+        useNativeDriver: false, // width animation doesn't support native driver
+      }).start();
+    };
+
+    animateProgress(caloriesProgress, getProgress(totalMacros.calories, targetMacros.calories));
+    animateProgress(proteinProgress, getProgress(totalMacros.protein, targetMacros.protein));
+    animateProgress(carbsProgress, getProgress(totalMacros.carbs, targetMacros.carbs));
+    animateProgress(fatProgress, getProgress(totalMacros.fat, targetMacros.fat));
+  }, [todayLog]);
+
   const formatNumber = (value: number) => {
     const rounded = Math.round(value * 10) / 10;
     return Number.isInteger(rounded) ? `${rounded}` : `${rounded}`;
@@ -178,15 +223,18 @@ export default function HomeScreen() {
                 </Text>
               </View>
               <View style={styles.progressBar}>
-                <View
+                <Animated.View
                   style={[
                     styles.progressFill,
                     {
-                      width: `${getProgress(totalMacros.calories, targetMacros.calories)}%`,
-                      backgroundColor:
-                        getProgress(totalMacros.calories, targetMacros.calories) > 100
-                          ? '#ff3b30'
-                          : '#34c759',
+                      width: caloriesProgress.interpolate({
+                        inputRange: [0, 100],
+                        outputRange: ['0%', '100%'],
+                      }),
+                      backgroundColor: caloriesProgress.interpolate({
+                        inputRange: [0, 100, 101],
+                        outputRange: ['#34c759', '#34c759', '#ff3b30'],
+                      }),
                     },
                   ]}
                 />
@@ -210,11 +258,14 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
-                  <View
+                  <Animated.View
                     style={[
                       styles.progressFill,
                       {
-                        width: `${getProgress(totalMacros.protein, targetMacros.protein)}%`,
+                        width: proteinProgress.interpolate({
+                          inputRange: [0, 100],
+                          outputRange: ['0%', '100%'],
+                        }),
                       },
                     ]}
                   />
@@ -237,11 +288,14 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
-                  <View
+                  <Animated.View
                     style={[
                       styles.progressFill,
                       {
-                        width: `${getProgress(totalMacros.carbs, targetMacros.carbs)}%`,
+                        width: carbsProgress.interpolate({
+                          inputRange: [0, 100],
+                          outputRange: ['0%', '100%'],
+                        }),
                       },
                     ]}
                   />
@@ -264,11 +318,14 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
-                  <View
+                  <Animated.View
                     style={[
                       styles.progressFill,
                       {
-                        width: `${getProgress(totalMacros.fat, targetMacros.fat)}%`,
+                        width: fatProgress.interpolate({
+                          inputRange: [0, 100],
+                          outputRange: ['0%', '100%'],
+                        }),
                       },
                     ]}
                   />
@@ -299,7 +356,7 @@ export default function HomeScreen() {
                         }
                         // Otherwise navigate normally
                         (navigation as any).navigate('FoodDetail', {
-                          food: mealFood.food,
+                          foodId: mealFood.food.id,
                           quantity: mealFood.quantity,
                           addedAt: mealFood.addedAt ? mealFood.addedAt.toISOString() : undefined,
                         });

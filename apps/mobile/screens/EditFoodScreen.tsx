@@ -6,8 +6,12 @@ import { FoodItem } from '@meal-planning/shared';
 import { saveFood } from '../utils/storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
 
+import { useFocusEffect } from '@react-navigation/native';
+import { useState, useCallback } from 'react';
+import { getFoodById } from '../utils/storage';
+
 type EditFoodRouteParams = {
-  food: FoodItem;
+  foodId: string;
 };
 
 type EditFoodRouteProp = RouteProp<{ EditFood: EditFoodRouteParams }, 'EditFood'>;
@@ -16,20 +20,30 @@ export default function EditFoodScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const route = useRoute<EditFoodRouteProp>();
-  const { food } = route.params;
+  const { foodId } = route.params;
+  const [food, setFood] = useState<FoodItem | null>(null);
+  const [loading, setLoading] = useState(true);
   const formRef = useRef<FoodFormRef>(null);
+
+  // Load food data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const loadFood = async () => {
+        setLoading(true);
+        const loadedFood = await getFoodById(foodId);
+        if (loadedFood) {
+          setFood(loadedFood);
+        }
+        setLoading(false);
+      };
+      loadFood();
+    }, [foodId])
+  );
 
   const handleSave = async (editedFood: FoodItem, quantity: number) => {
     try {
       await saveFood(editedFood);
-      Alert.alert('Success', `Updated ${editedFood.name}`, [
-        {
-          text: 'OK',
-          onPress: () => {
-            navigation.goBack();
-          },
-        },
-      ]);
+      navigation.goBack();
     } catch (error) {
       console.error('Error updating food:', error);
       Alert.alert('Error', 'Failed to update food. Please try again.');
@@ -49,6 +63,16 @@ export default function EditFoodScreen() {
   const handleCancel = () => {
     navigation.goBack();
   };
+
+  if (loading || !food) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.content, { paddingTop: insets.top + 20 }]}>
+          <Text style={styles.title}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

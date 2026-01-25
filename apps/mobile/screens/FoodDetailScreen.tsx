@@ -1,12 +1,13 @@
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { FoodItem, formatMacroValue } from '@meal-planning/shared';
-import { saveFood, addFoodToToday, generateFoodId } from '../utils/storage';
+import { saveFood, addFoodToToday, generateFoodId, getFoodById } from '../utils/storage';
 
 type FoodDetailRouteParams = {
-  food: FoodItem;
+  foodId: string;
   quantity?: number;
   addedAt?: string; // ISO string
 };
@@ -17,8 +18,26 @@ export default function FoodDetailScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const route = useRoute<FoodDetailRouteProp>();
-  const { food, quantity = 1, addedAt: addedAtString } = route.params;
+  const { foodId, quantity: initialQuantity = 1, addedAt: addedAtString } = route.params;
+  const [food, setFood] = useState<FoodItem | null>(null);
+  const [quantity, setQuantity] = useState(initialQuantity);
+  const [loading, setLoading] = useState(true);
   const addedAt = addedAtString ? new Date(addedAtString) : undefined;
+
+  // Load food data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const loadFood = async () => {
+        setLoading(true);
+        const loadedFood = await getFoodById(foodId);
+        if (loadedFood) {
+          setFood(loadedFood);
+        }
+        setLoading(false);
+      };
+      loadFood();
+    }, [foodId])
+  );
 
   const formatNumber = (value: number) => {
     const rounded = Math.round(value * 10) / 10;
@@ -41,23 +60,20 @@ export default function FoodDetailScreen() {
     return macros.protein * 4 + macros.carbs * 4 + macros.fat * 9;
   };
 
-  const totalCalories = calculateCaloriesFromMacros(food.macros) * quantity;
-  const totalProtein = food.macros.protein * quantity;
-  const totalCarbs = food.macros.carbs * quantity;
-  const totalFat = food.macros.fat * quantity;
-
   const handleEdit = () => {
+    if (!food) return;
     try {
       // Navigate to EditFood screen in the same stack
-      (navigation as any).navigate('EditFood', { food });
+      (navigation as any).navigate('EditFood', { foodId: food.id });
     } catch (error) {
       console.error('Navigation error:', error);
       // Fallback: try using push
-      (navigation as any).push('EditFood', { food });
+      (navigation as any).push('EditFood', { foodId: food.id });
     }
   };
 
   const handleDuplicate = async () => {
+    if (!food) return;
     try {
       // Create a copy of the food item with a new UUID
       const copiedFood: FoodItem = {
@@ -88,6 +104,22 @@ export default function FoodDetailScreen() {
   const handleBack = () => {
     navigation.goBack();
   };
+
+  if (loading || !food) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.content, { paddingTop: insets.top + 20 }]}>
+          <Text style={styles.title}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Calculate totals only when food is loaded
+  const totalCalories = calculateCaloriesFromMacros(food.macros) * quantity;
+  const totalProtein = food.macros.protein * quantity;
+  const totalCarbs = food.macros.carbs * quantity;
+  const totalFat = food.macros.fat * quantity;
 
   return (
     <View style={styles.container}>

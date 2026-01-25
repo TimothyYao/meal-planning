@@ -64,10 +64,20 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
   const [fat, setFat] = useState(initialFood?.macros.fat.toString() || '');
   const [selectedServingId, setSelectedServingId] = useState(() => {
     if (initialFood) {
+      // Normalize values for comparison - trim whitespace and ensure consistent types
+      const foodSize = Number(initialFood.servingSize);
+      const foodUnit = String(initialFood.servingUnit).trim().toLowerCase();
+      
+      // Match by comparing both value and unit, ensuring type consistency
       const option = SERVING_OPTIONS.find(
-        opt => opt.value === initialFood.servingSize && opt.unit === initialFood.servingUnit
+        opt => Number(opt.value) === foodSize && 
+               String(opt.unit).trim().toLowerCase() === foodUnit
       );
-      return option?.id || DEFAULT_SERVING_ID;
+      if (option) {
+        return option.id;
+      }
+      // If no match found, default to standard serving size
+      return DEFAULT_SERVING_ID;
     }
     return DEFAULT_SERVING_ID;
   });
@@ -145,15 +155,16 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
     };
 
     const serving = SERVING_OPTIONS.find((option) => option.id === selectedServingId);
-    const servingSize = serving?.value ?? 0;
-    const servingUnit = serving?.unit ?? 'g';
-
-    if (servingSize <= 0) {
+    if (!serving) {
+      console.error('Selected serving ID not found:', selectedServingId);
       if (onValidationError) {
-        onValidationError('Please enter a valid serving size');
+        onValidationError('Invalid serving size selected');
       }
       return;
     }
+    
+    const servingSize = serving.value;
+    const servingUnit = serving.unit;
 
     const foodItem: FoodItem = {
       id: initialFood?.id || await generateFoodId(),
