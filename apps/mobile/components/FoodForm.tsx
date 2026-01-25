@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Modal,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FoodItem, MacroTargets } from '@meal-planning/shared';
@@ -154,6 +155,35 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
       fat: fatValue,
     };
 
+    // Check if calories is 0 and ask for confirmation
+    if (calculatedCalories === 0) {
+      const shouldProceed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          'Zero Calories',
+          'This food has 0 calories. Are you sure you want to save it?',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => resolve(false),
+            },
+            {
+              text: 'Save',
+              onPress: () => resolve(true),
+            },
+          ]
+        );
+      });
+
+      if (!shouldProceed) {
+        return;
+      }
+    }
+
+    await proceedWithSave(macros);
+  };
+
+  const proceedWithSave = async (macros: MacroTargets) => {
     const serving = SERVING_OPTIONS.find((option) => option.id === selectedServingId);
     if (!serving) {
       console.error('Selected serving ID not found:', selectedServingId);
