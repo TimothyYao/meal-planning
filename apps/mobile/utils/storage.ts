@@ -1,8 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DailyLog, MealFood, FoodItem, MacroTargets, calculateMacros } from '@meal-planning/shared';
+import { DailyLog, MealFood, FoodItem, MacroTargets, calculateMacros, Meal } from '@meal-planning/shared';
 
 const DAILY_LOGS_KEY = '@meal_planning:daily_logs';
 const FOODS_KEY = '@meal_planning:foods';
+const LAST_PROTEIN_KEY = '@meal_planning:last_protein';
+const LAST_CARBS_KEY = '@meal_planning:last_carbs';
+const LAST_FAT_KEY = '@meal_planning:last_fat';
 
 // Get today's date in YYYY-MM-DD format
 export function getTodayDate(): string {
@@ -82,11 +85,11 @@ export async function addFoodToToday(food: FoodItem, quantity: number = 1): Prom
       todayLog.meals[0].foods.push(mealFood);
       todayLog.meals[0].macros = calculateMacros(todayLog.meals[0].foods);
     }
-    
+
     // Recalculate total macros for the day
-    const allMealFoods: MealFood[] = todayLog.meals.flatMap(meal => meal.foods);
+    const allMealFoods: MealFood[] = todayLog.meals.flatMap((meal: Meal) => meal.foods);
     todayLog.totalMacros = calculateMacros(allMealFoods);
-    
+
     // Convert Date objects to ISO strings for storage
     const logToSave = {
       ...todayLog,
@@ -225,5 +228,65 @@ export async function setTodayTargetMacros(targets: MacroTargets): Promise<void>
   } catch (error) {
     console.error('Error setting target macros:', error);
     throw error;
+  }
+}
+
+// Save last protein value
+export async function saveLastProtein(protein: number): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LAST_PROTEIN_KEY, protein.toString());
+  } catch (error) {
+    console.error('Error saving last protein:', error);
+  }
+}
+
+// Get last protein value
+export async function getLastProtein(): Promise<number | null> {
+  try {
+    const value = await AsyncStorage.getItem(LAST_PROTEIN_KEY);
+    return value ? parseFloat(value) : null;
+  } catch (error) {
+    console.error('Error getting last protein:', error);
+    return null;
+  }
+}
+
+// Save last carbs value
+export async function saveLastCarbs(carbs: number): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LAST_CARBS_KEY, carbs.toString());
+  } catch (error) {
+    console.error('Error saving last carbs:', error);
+  }
+}
+
+// Get last carbs value
+export async function getLastCarbs(): Promise<number | null> {
+  try {
+    const value = await AsyncStorage.getItem(LAST_CARBS_KEY);
+    return value ? parseFloat(value) : null;
+  } catch (error) {
+    console.error('Error getting last carbs:', error);
+    return null;
+  }
+}
+
+// Save last fat value
+export async function saveLastFat(fat: number): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LAST_FAT_KEY, fat.toString());
+  } catch (error) {
+    console.error('Error saving last fat:', error);
+  }
+}
+
+// Get last fat value
+export async function getLastFat(): Promise<number | null> {
+  try {
+    const value = await AsyncStorage.getItem(LAST_FAT_KEY);
+    return value ? parseFloat(value) : null;
+  } catch (error) {
+    console.error('Error getting last fat:', error);
+    return null;
   }
 }
