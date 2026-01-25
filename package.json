@@ -7,6 +7,9 @@
     "apps/*",
     "packages/*"
   ],
+  "overrides": {
+    "@react-navigation/native": "7.0.3"
+  },
   "scripts": {
     "mobile": "npm run start --workspace=apps/mobile",
     "ios": "npm run ios --workspace=apps/mobile",
