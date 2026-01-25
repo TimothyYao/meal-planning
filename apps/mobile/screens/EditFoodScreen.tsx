@@ -5,8 +5,6 @@ import { useRef, useState } from 'react';
 import { FoodItem } from '@meal-planning/shared';
 import { saveFood, getFoodById, updateFoodQuantityInDate, moveFoodToDate, getTodayDate } from '../utils/storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
-import { NumberEditor } from '../components/NumberEditor';
-import { Ionicons } from '@expo/vector-icons';
 
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
@@ -28,7 +26,6 @@ export default function EditFoodScreen() {
   const { foodId, mealId, foodIndex, date, quantity: initialQuantity = 1 } = route.params;
   const [food, setFood] = useState<FoodItem | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showQuantityEditor, setShowQuantityEditor] = useState(false);
   const [currentQuantity, setCurrentQuantity] = useState(initialQuantity);
   const formRef = useRef<FoodFormRef>(null);
   const isExistingLog = mealId !== undefined && foodIndex !== undefined;
@@ -57,12 +54,15 @@ export default function EditFoodScreen() {
         const oldDate = date || getTodayDate();
         const newDateString = newDate ? formatDateString(newDate) : oldDate;
         
+        // Update quantity from the form
+        setCurrentQuantity(quantity);
+        
         // If date changed, move the food to the new date
         if (newDateString !== oldDate) {
           await moveFoodToDate(oldDate, newDateString, mealId, foodIndex);
         } else {
           // Just update the quantity if date didn't change
-          await updateFoodQuantityInDate(oldDate, mealId, foodIndex, currentQuantity);
+          await updateFoodQuantityInDate(oldDate, mealId, foodIndex, quantity);
         }
       }
       
@@ -80,30 +80,6 @@ export default function EditFoodScreen() {
     return `${year}-${month}-${day}`;
   };
 
-  const handleEditQuantity = () => {
-    setShowQuantityEditor(true);
-  };
-
-  const handleSaveQuantity = async (newQuantity: number) => {
-    setCurrentQuantity(newQuantity);
-    setShowQuantityEditor(false);
-    
-    // If this is an existing log entry, update it in the log
-    if (isExistingLog && mealId && foodIndex !== undefined) {
-      try {
-        const dateToUpdate = date || getTodayDate();
-        await updateFoodQuantityInDate(dateToUpdate, mealId, foodIndex, newQuantity);
-      } catch (error) {
-        console.error('Error updating quantity:', error);
-        Alert.alert('Error', 'Failed to update quantity. Please try again.');
-      }
-    }
-  };
-
-  const formatNumber = (value: number) => {
-    const rounded = Math.round(value * 10) / 10;
-    return Number.isInteger(rounded) ? `${rounded}` : `${rounded}`;
-  };
 
   const handleValidationError = (message: string) => {
     Alert.alert('Error', message);
@@ -145,30 +121,15 @@ export default function EditFoodScreen() {
         <FoodForm
           ref={formRef}
           initialFood={food}
-          initialQuantity={initialQuantity.toString()}
+          initialQuantity={currentQuantity.toString()}
           initialDate={date ? new Date(date + 'T00:00:00') : new Date()}
           onSave={handleSave}
-          showQuantity={false}
+          showQuantity={true}
           showDate={isExistingLog}
           hideSaveButton={true}
           onValidationError={handleValidationError}
           noPadding={true}
         />
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Serving Information</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Number of Servings</Text>
-            <TouchableOpacity
-              style={styles.quantityRow}
-              onPress={handleEditQuantity}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.infoValue}>{formatNumber(currentQuantity)}</Text>
-              <Ionicons name="pencil" size={16} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
       </ScrollView>
 
       <View style={[styles.bottomButtonContainer, { paddingBottom: insets.bottom + 20 }]}>
@@ -188,19 +149,6 @@ export default function EditFoodScreen() {
           <Text style={styles.saveButtonText}>Save</Text>
         </TouchableOpacity>
       </View>
-
-      <NumberEditor
-        visible={showQuantityEditor}
-        value={currentQuantity}
-        onSave={handleSaveQuantity}
-        onCancel={() => setShowQuantityEditor(false)}
-        min={0.1}
-        max={999}
-        title="Number of Servings"
-        unit="servings"
-        keyboardType="decimal-pad"
-        hideRange={true}
-      />
     </View>
   );
 }
@@ -270,35 +218,5 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 17,
     fontWeight: '400',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  infoLabel: {
-    fontSize: 16,
-    color: '#666',
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  quantityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
 });
