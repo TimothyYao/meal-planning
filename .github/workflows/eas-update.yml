@@ -37,7 +37,22 @@ jobs:
 
       - name: Create update
         working-directory: ./apps/mobile
-        run: eas update --branch production --message "Update from GitHub Actions: $(git log -1 --pretty=%B)"
+        run: |
+          # Validate that required secrets are present
+          MISSING_SECRETS=0
+          if [ -z "$EXPO_PUBLIC_FIREBASE_API_KEY" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_API_KEY secret"; MISSING_SECRETS=1; fi
+          if [ -z "$EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN secret"; MISSING_SECRETS=1; fi
+          if [ -z "$EXPO_PUBLIC_FIREBASE_PROJECT_ID" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_PROJECT_ID secret"; MISSING_SECRETS=1; fi
+          if [ -z "$EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET secret"; MISSING_SECRETS=1; fi
+          if [ -z "$EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID secret"; MISSING_SECRETS=1; fi
+          if [ -z "$EXPO_PUBLIC_FIREBASE_APP_ID" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_APP_ID secret"; MISSING_SECRETS=1; fi
+          
+          if [ $MISSING_SECRETS -eq 1 ]; then
+            echo "One or more required Firebase secrets are missing. Please add them in GitHub Repository Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+          eas update --branch production --message "Update from GitHub Actions: $(git log -1 --pretty=%B)"
         env:
           EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
           EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
