@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useRef, useState } from 'react';
 import { FoodItem, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
-import { saveFood, getFoodById, updateFoodQuantityInDate, moveFoodToDate, getTodayDate } from '../storage';
+import { getFoodById, updateFoodInLogEntry, moveFoodToDate } from '../storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
 import { safeGoBack } from '../utils/navigation';
 
@@ -12,9 +12,9 @@ import { useCallback } from 'react';
 
 type EditFoodRouteParams = {
   foodId: string;
-  mealId?: string;
-  foodIndex?: number;
-  date?: string; // YYYY-MM-DD format
+  mealId: string; // Required - must be editing a log entry
+  foodIndex: number; // Required - must be editing a log entry
+  date: string; // Required - YYYY-MM-DD format
   quantity?: number;
 };
 
@@ -30,7 +30,6 @@ export default function EditFoodScreen() {
   const [currentQuantity, setCurrentQuantity] = useState(initialQuantity);
   const [isSaving, setIsSaving] = useState(false);
   const formRef = useRef<FoodFormRef>(null);
-  const isExistingLog = mealId !== undefined && foodIndex !== undefined;
 
   // Load food data when screen comes into focus
   useFocusEffect(
@@ -52,24 +51,21 @@ export default function EditFoodScreen() {
     
     setIsSaving(true);
     try {
-      // Save food to database (cache first, then Firebase)
-      await saveFood(editedFood);
+      // Always update the log entry (this screen only edits log entries)
+      const oldDate = date;
+      const newDateString = newDate ? formatDateString(newDate) : oldDate;
       
-      // If this is an existing log entry, update the quantity and potentially move the date
-      if (isExistingLog && mealId && foodIndex !== undefined) {
-        const oldDate = date || getTodayDate();
-        const newDateString = newDate ? formatDateString(newDate) : oldDate;
-        
-        // Update quantity from the form
-        setCurrentQuantity(quantity);
-        
-        // If date changed, move the food to the new date
-        if (newDateString !== oldDate) {
-          await moveFoodToDate(oldDate, newDateString, mealId, foodIndex);
-        } else {
-          // Just update the quantity if date didn't change
-          await updateFoodQuantityInDate(oldDate, mealId, foodIndex, quantity);
-        }
+      // Update quantity from the form
+      setCurrentQuantity(quantity);
+      
+      // If date changed, move the food to the new date first
+      if (newDateString !== oldDate) {
+        await moveFoodToDate(oldDate, newDateString, mealId, foodIndex);
+        // After moving, update the food in the new location
+        await updateFoodInLogEntry(newDateString, mealId, foodIndex, editedFood, quantity);
+      } else {
+        // Update the food object and quantity in this log entry only
+        await updateFoodInLogEntry(oldDate, mealId, foodIndex, editedFood, quantity);
       }
       
       safeGoBack(navigation);
@@ -133,7 +129,7 @@ export default function EditFoodScreen() {
           initialDate={date ? new Date(date + 'T00:00:00') : new Date()}
           onSave={handleSave}
           showQuantity={true}
-          showDate={isExistingLog}
+          showDate={true}
           hideSaveButton={true}
           onValidationError={handleValidationError}
           noPadding={true}

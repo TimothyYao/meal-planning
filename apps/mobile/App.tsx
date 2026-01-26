@@ -144,8 +144,16 @@ const linking = {
             path: 'home',
             screens: {
               HomeMain: '',
-              FoodDetail: 'food/:foodId',
-              EditFood: 'food/:foodId/edit',
+              FoodDetail: 'log-entry/:date/:mealId/:foodIndex',
+              EditFood: {
+                path: 'log-entry/:date/:mealId/:foodIndex/:foodId/edit',
+                parse: {
+                  date: (date: string) => date,
+                  mealId: (mealId: string) => mealId,
+                  foodIndex: (foodIndex: string) => parseInt(foodIndex, 10),
+                  foodId: (foodId: string) => foodId,
+                },
+              },
             },
           },
           AddFoodTab: 'add-food',

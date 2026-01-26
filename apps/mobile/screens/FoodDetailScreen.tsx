@@ -1,19 +1,20 @@
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useNavigation, useRoute, RouteProp, useFocusEffect, useIsFocused, NavigationProp } from '@react-navigation/native';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { FoodItem, formatMacroValue, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
-import { saveFood, addFoodToDate, generateFoodId, getFoodById, getTodayDate } from '../storage';
+import { MealFood, spacing, fontSize, fontColor, colors, deserializeDailyLog } from '@meal-planning/shared';
+import { saveFood, addFoodToDate, generateFoodId, getTodayDate, getLogForDate } from '../storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DAILY_LOGS_KEY } from '../storage/constants';
 import { safeGoBack } from '../utils/navigation';
+import FoodDetail from '../components/FoodDetail';
 
 type FoodDetailRouteParams = {
-  foodId: string;
-  quantity?: number;
-  addedAt?: string; // ISO string
-  mealId?: string;
-  foodIndex?: number;
-  date?: string; // YYYY-MM-DD format
+  mealId: string;
+  foodIndex: number;
+  date: string; // YYYY-MM-DD format
+  mealFood?: MealFood; // Optional: pass mealFood directly to avoid loading from log
 };
 
 type FoodDetailRouteProp = RouteProp<{ FoodDetail: FoodDetailRouteParams }, 'FoodDetail'>;
@@ -22,86 +23,169 @@ export default function FoodDetailScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const route = useRoute<FoodDetailRouteProp>();
-  const { foodId, quantity: initialQuantity = 1, addedAt: addedAtString, mealId, foodIndex, date } = route.params;
-  const [food, setFood] = useState<FoodItem | null>(null);
-  const [quantity] = useState(initialQuantity);
-  const [loading, setLoading] = useState(true);
+  const { mealId, foodIndex, date, mealFood: passedMealFood } = route.params;
+  
+  // Use passed mealFood as primary source, only load if not provided
+  const [mealFood, setMealFood] = useState<MealFood | null>(passedMealFood || null);
+  const [loading, setLoading] = useState(!passedMealFood);
   const [isCopying, setIsCopying] = useState(false);
-  const addedAt = addedAtString ? new Date(addedAtString) : undefined;
+  const mealFoodRef = useRef<MealFood | null>(passedMealFood || null);
 
-  // Load food data when screen comes into focus
+  // Keep ref in sync with state
+  useEffect(() => {
+    mealFoodRef.current = mealFood;
+  }, [mealFood]);
+
+  // Function to load mealFood from log entry
+  const loadMealFoodFromLog = useCallback(async () => {
+    try {
+      console.log('[FoodDetailScreen] Loading mealFood from log', { date, mealId, foodIndex });
+      
+      // Force a fresh read from AsyncStorage by reading directly
+      const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+      const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
+      const log = logs[date];
+      
+      if (log) {
+        // Deserialize the log
+        const dailyLog = deserializeDailyLog(log);
+        
+        const meal = dailyLog.meals.find(m => m.id === mealId);
+        if (meal && meal.foods[foodIndex]) {
+          const loadedMealFood = meal.foods[foodIndex];
+          console.log('[FoodDetailScreen] Found mealFood:', loadedMealFood.food.name, 'quantity:', loadedMealFood.quantity);
+          setMealFood(loadedMealFood);
+          return loadedMealFood;
+        } else {
+          console.warn('[FoodDetailScreen] Meal or food not found', { mealFound: !!meal, foodIndex, foodsLength: meal?.foods?.length });
+        }
+      } else {
+        console.warn('[FoodDetailScreen] Log not found for date:', date);
+        // Fallback to getLogForDate
+        const logFromFunction = await getLogForDate(date);
+        if (logFromFunction) {
+          const meal = logFromFunction.meals.find(m => m.id === mealId);
+          if (meal && meal.foods[foodIndex]) {
+            const loadedMealFood = meal.foods[foodIndex];
+            setMealFood(loadedMealFood);
+            return loadedMealFood;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[FoodDetailScreen] Error loading mealFood from log:', error);
+    }
+    return null;
+  }, [date, mealId, foodIndex]);
+
+  // Update mealFood when route params change (initial load)
+  useEffect(() => {
+    if (passedMealFood) {
+      setMealFood(passedMealFood);
+      mealFoodRef.current = passedMealFood;
+      setLoading(false);
+    }
+  }, [passedMealFood]);
+
+  // Track if this is the initial load
+  const isInitialLoadRef = useRef(true);
+  
+  // Load mealFood from log entry whenever screen is focused
+  // Always reload to ensure we have latest data (especially after editing)
   useFocusEffect(
     useCallback(() => {
-      const loadFood = async () => {
-        setLoading(true);
-        const loadedFood = await getFoodById(foodId);
-        if (loadedFood) {
-          setFood(loadedFood);
+      const reload = async () => {
+        // On initial load, show loading if we don't have data
+        if (isInitialLoadRef.current && !mealFoodRef.current) {
+          setLoading(true);
         }
+        
+        // Always reload to get the latest data
+        // This ensures we get updates after editing, even if focus didn't change
+        console.log('[FoodDetailScreen] useFocusEffect triggered, reloading mealFood');
+        const updatedMealFood = await loadMealFoodFromLog();
+        if (updatedMealFood) {
+          setMealFood(updatedMealFood);
+        }
+        
         setLoading(false);
+        isInitialLoadRef.current = false;
       };
-      loadFood();
-    }, [foodId])
+      
+      // Small delay to ensure any save operations complete
+      setTimeout(() => {
+        reload();
+      }, 200);
+    }, [loadMealFoodFromLog]) // Don't include mealFood to avoid stale closures
   );
 
-  const formatNumber = (value: number) => {
-    const rounded = Math.round(value * 10) / 10;
-    return Number.isInteger(rounded) ? `${rounded}` : `${rounded}`;
-  };
-
-  const formatServingSize = (size: number, unit: string) => {
-    const sizeText = formatNumber(size);
-    return unit ? `${sizeText} ${unit}` : sizeText;
-  };
-
-  const formatTime = (date: Date | undefined) => {
-    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
-      return '';
-    }
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
+  // Track previous navigation state to detect when EditFood closes
+  const prevHasEditFoodRef = useRef(false);
+  
+  // Listen for navigation state changes to detect when EditFood closes
+  // This works even when the screen doesn't lose/regain focus (modal behavior)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('state', (e) => {
+      try {
+        const state = e.data.state;
+        const routes = state?.routes || [];
+        const currentRoute = routes[routes.length - 1];
+        const hasEditFood = routes.some((r: any) => r.name === 'EditFood');
+        const isFoodDetail = currentRoute?.name === 'FoodDetail';
+        
+        // If EditFood was open and now it's closed, and we're on FoodDetail, reload
+        if (prevHasEditFoodRef.current && !hasEditFood && isFoodDetail) {
+          console.log('[FoodDetailScreen] EditFood closed (detected via navigation state), reloading mealFood');
+          setTimeout(() => {
+            loadMealFoodFromLog();
+          }, 200);
+        }
+        
+        prevHasEditFoodRef.current = hasEditFood;
+      } catch (error) {
+        console.error('[FoodDetailScreen] Error in navigation state listener:', error);
+      }
     });
-  };
 
-  const calculateCaloriesFromMacros = (macros: { protein: number; carbs: number; fat: number }) => {
-    return macros.protein * 4 + macros.carbs * 4 + macros.fat * 9;
-  };
+    return unsubscribe;
+  }, [navigation, loadMealFoodFromLog]);
+
 
   const handleEdit = () => {
-    if (!food) return;
+    if (!mealFood) return;
     try {
       // Navigate to EditFood screen with all necessary parameters
       (navigation as any).navigate('EditFood', { 
-        foodId: food.id,
+        foodId: mealFood.food.id,
         mealId,
         foodIndex,
         date,
-        quantity: initialQuantity,
+        quantity: mealFood.quantity,
       });
     } catch (error) {
       console.error('Navigation error:', error);
       // Fallback: try using push
       (navigation as any).push('EditFood', { 
-        foodId: food.id,
+        foodId: mealFood.food.id,
         mealId,
         foodIndex,
         date,
-        quantity: initialQuantity,
+        quantity: mealFood.quantity,
       });
     }
   };
 
   const handleDuplicate = async () => {
-    if (!food || isCopying) return;
+    if (!mealFood || isCopying) return;
     
     setIsCopying(true);
     try {
+      const food = mealFood.food;
       console.log('Starting copy operation for food:', food.name);
       
       // Create a copy of the food item with a new UUID
       const newId = await generateFoodId();
-      const copiedFood: FoodItem = {
+      const copiedFood = {
         ...food,
         id: newId,
       };
@@ -112,9 +196,9 @@ export default function FoodDetailScreen() {
       await saveFood(copiedFood);
       console.log('Saved copied food to cache');
 
-      // Add to the date's log (use the date from route params, or today if not available)
-      const targetDate = date || getTodayDate();
-      await addFoodToDate(copiedFood, quantity, targetDate);
+      // Add to today's log with the same quantity
+      const targetDate = getTodayDate();
+      await addFoodToDate(copiedFood, mealFood.quantity, targetDate);
       console.log(`Added copied food to ${targetDate}'s log`);
 
       Alert.alert('Success', `Copied ${food.name} and added to today's log`, [
@@ -138,7 +222,7 @@ export default function FoodDetailScreen() {
     safeGoBack(navigation);
   };
 
-  if (loading || !food) {
+  if (loading || !mealFood) {
     return (
       <View style={styles.container}>
         <View style={[styles.content, { paddingTop: insets.top + 20 }]}>
@@ -148,120 +232,13 @@ export default function FoodDetailScreen() {
     );
   }
 
-  // Calculate totals only when food is loaded
-  const totalCalories = calculateCaloriesFromMacros(food.macros) * quantity;
-  const totalProtein = food.macros.protein * quantity;
-  const totalCarbs = food.macros.carbs * quantity;
-  const totalFat = food.macros.fat * quantity;
-
   return (
     <View style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.content, 
-          { 
-            paddingTop: insets.top + 20,
-            paddingBottom: 100 + insets.bottom, // Space for bottom buttons
-          }
-        ]}
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>{food.name}</Text>
-          {quantity !== 1 && (
-            <Text style={styles.quantity}>{formatNumber(quantity)} servings</Text>
-          )}
-          {addedAt && (
-            <Text style={styles.addedTime}>
-              {formatTime(addedAt)}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Serving Information</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Serving Size</Text>
-            <Text style={styles.infoValue}>
-              {formatServingSize(food.servingSize, food.servingUnit)}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Number of Servings</Text>
-            <Text style={styles.infoValue}>{formatNumber(quantity)}</Text>
-          </View>
-          {quantity !== 1 && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Total Amount</Text>
-              <Text style={styles.infoValue}>
-                {formatServingSize(food.servingSize * quantity, food.servingUnit)}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Macros (per serving)</Text>
-          <View style={styles.macroCard}>
-            <View style={styles.macroRow}>
-              <Text style={styles.macroLabel}>Calories</Text>
-              <Text style={styles.macroValue}>
-                {formatMacroValue(calculateCaloriesFromMacros(food.macros), 'calories')}
-              </Text>
-            </View>
-            <View style={styles.macroRow}>
-              <Text style={styles.macroLabel}>Protein</Text>
-              <Text style={styles.macroValue}>
-                {formatMacroValue(food.macros.protein, 'grams')}
-              </Text>
-            </View>
-            <View style={styles.macroRow}>
-              <Text style={styles.macroLabel}>Carbs</Text>
-              <Text style={styles.macroValue}>
-                {formatMacroValue(food.macros.carbs, 'grams')}
-              </Text>
-            </View>
-            <View style={styles.macroRow}>
-              <Text style={styles.macroLabel}>Fat</Text>
-              <Text style={styles.macroValue}>
-                {formatMacroValue(food.macros.fat, 'grams')}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {quantity !== 1 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Total Macros ({formatNumber(quantity)} servings)</Text>
-            <View style={styles.macroCard}>
-              <View style={styles.macroRow}>
-                <Text style={styles.macroLabel}>Calories</Text>
-                <Text style={styles.macroValue}>
-                  {formatMacroValue(totalCalories, 'calories')}
-                </Text>
-              </View>
-              <View style={styles.macroRow}>
-                <Text style={styles.macroLabel}>Protein</Text>
-                <Text style={styles.macroValue}>
-                  {formatMacroValue(totalProtein, 'grams')}
-                </Text>
-              </View>
-              <View style={styles.macroRow}>
-                <Text style={styles.macroLabel}>Carbs</Text>
-                <Text style={styles.macroValue}>
-                  {formatMacroValue(totalCarbs, 'grams')}
-                </Text>
-              </View>
-              <View style={styles.macroRow}>
-                <Text style={styles.macroLabel}>Fat</Text>
-                <Text style={styles.macroValue}>
-                  {formatMacroValue(totalFat, 'grams')}
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-      </ScrollView>
+      <FoodDetail 
+        food={mealFood.food} 
+        quantity={mealFood.quantity} 
+        addedAt={mealFood.addedAt}
+      />
 
       <View style={[styles.bottomButtonContainer, { paddingBottom: insets.bottom + 16 }]}>
         <TouchableOpacity style={styles.navTile} onPress={handleEdit} activeOpacity={0.7}>
@@ -272,13 +249,10 @@ export default function FoodDetailScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.navTile, (isCopying || !food) && styles.navTileDisabled]} 
-          onPress={() => {
-            console.log('Copy button pressed, food:', food?.name, 'isCopying:', isCopying);
-            handleDuplicate();
-          }} 
+          style={[styles.navTile, (isCopying || !mealFood) && styles.navTileDisabled]} 
+          onPress={handleDuplicate}
           activeOpacity={0.7}
-          disabled={isCopying || !food}
+          disabled={isCopying || !mealFood}
         >
           <View style={styles.tileIconContainer}>
             {isCopying ? (
@@ -306,73 +280,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background.primary,
   },
-  scrollView: {
-    flex: 1,
-  },
   content: {
     padding: spacing.xl,
-  },
-  header: {
-    marginBottom: spacing['2xl'],
   },
   title: {
     fontSize: fontSize['4xl'],
     fontWeight: 'bold',
-    marginBottom: spacing.sm,
-  },
-  quantity: {
-    fontSize: fontSize.lg,
-    color: fontColor.tertiary,
-  },
-  addedTime: {
-    fontSize: fontSize.sm,
-    color: fontColor.quaternary,
-    marginTop: spacing.xs,
-  },
-  section: {
-    marginBottom: spacing['3xl'],
-  },
-  sectionTitle: {
-    fontSize: fontSize.xl,
-    fontWeight: '600',
-    marginBottom: spacing.lg,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.tertiary,
-  },
-  infoLabel: {
-    fontSize: fontSize.base,
-    color: fontColor.tertiary,
-  },
-  infoValue: {
-    fontSize: fontSize.base,
-    fontWeight: '500',
-    color: fontColor.secondary,
-  },
-  macroCard: {
-    backgroundColor: colors.background.secondary,
-    borderRadius: 12,
-    padding: spacing.lg,
-  },
-  macroRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  macroLabel: {
-    fontSize: fontSize.base,
-    color: fontColor.tertiary,
-  },
-  macroValue: {
-    fontSize: fontSize.lg,
-    fontWeight: '600',
-    color: colors.primary,
   },
   bottomButtonContainer: {
     position: 'absolute',

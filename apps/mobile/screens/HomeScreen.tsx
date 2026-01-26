@@ -459,13 +459,12 @@ export default function HomeScreen() {
                           return;
                         }
                         // Otherwise navigate normally
+                        // Pass the mealFood directly since it's the log entry we want to show
                         (navigation as any).navigate('FoodDetail', {
-                          foodId: mealFood.food.id,
-                          quantity: mealFood.quantity,
-                          addedAt: mealFood.addedAt ? mealFood.addedAt.toISOString() : undefined,
                           mealId: meal.id,
                           foodIndex: index,
                           date: formatDateString(selectedDate),
+                          mealFood: mealFood, // Pass the full mealFood to avoid loading from log
                         });
                       }}
                       onRemove={() => handleRemoveFood(meal.id, index, mealFood.food.name)}

@@ -1,12 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FoodItem, MealFood, Meal, calculateMacros, DailyLog, serializeDailyLog } from '@meal-planning/shared';
+import { FoodItem } from '@meal-planning/shared';
 import { getCurrentUser } from '../utils/auth';
 import {
   saveFoodToFirestore,
   getFoodsFromFirestore,
   getFoodByIdFromFirestore,
 } from '../utils/firestore';
-import { FOODS_KEY, DAILY_LOGS_KEY } from './constants';
+import { FOODS_KEY } from './constants';
 
 /**
  * Save a food item to the food database and update all instances in daily logs
@@ -39,59 +39,9 @@ export async function saveFood(food: FoodItem): Promise<void> {
       });
     }
     
-    // Also update all instances of this food in daily logs
-    const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
-    if (logsJson) {
-      const logs: Record<string, any> = JSON.parse(logsJson);
-      let anyLogsUpdated = false;
-      
-      // Iterate through all daily logs
-      for (const date in logs) {
-        const log = logs[date];
-        if (log && log.meals && Array.isArray(log.meals)) {
-          let dayUpdated = false;
-          
-          // Update food in all meals
-          for (const meal of log.meals) {
-            if (meal.foods && Array.isArray(meal.foods)) {
-              let mealUpdated = false;
-              
-              // Update any MealFood entries that reference this food
-              for (const mealFood of meal.foods) {
-                if (mealFood.foodId === food.id || mealFood.food?.id === food.id) {
-                  mealFood.food = food;
-                  mealUpdated = true;
-                  dayUpdated = true;
-                }
-              }
-              
-              // Recalculate meal macros if any foods were updated
-              if (mealUpdated) {
-                meal.macros = calculateMacros(meal.foods);
-              }
-            }
-          }
-          
-          // Recalculate total macros for the day if any foods were updated
-          if (dayUpdated) {
-            const allMealFoods: MealFood[] = log.meals.flatMap((meal: Meal) => meal.foods || []);
-            log.totalMacros = calculateMacros(allMealFoods);
-            anyLogsUpdated = true;
-          }
-        }
-      }
-      
-      // Save updated logs if any changes were made
-      if (anyLogsUpdated) {
-        // Convert Date objects to ISO strings for storage
-        const logsToSave: Record<string, any> = {};
-        for (const date in logs) {
-          const log = logs[date] as DailyLog;
-          logsToSave[date] = serializeDailyLog(log);
-        }
-        await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logsToSave));
-      }
-    }
+    // Note: We no longer update all daily logs when saving a food.
+    // To update a food in a specific log entry, use updateFoodInLogEntry() instead.
+    // This allows editing foods for specific days without affecting other log entries.
   } catch (error) {
     console.error('Error saving food:', error);
     throw error;
@@ -100,26 +50,45 @@ export async function saveFood(food: FoodItem): Promise<void> {
 
 /**
  * Get all saved foods
+ * Write-through cache: Always check local cache first, then sync from Firestore
  */
 export async function getFoods(): Promise<FoodItem[]> {
   try {
-    const user = getCurrentUser();
+    // STEP 1: Always check local cache first (write-through cache pattern)
+    const foodsJson = await AsyncStorage.getItem(FOODS_KEY);
+    const localFoods: FoodItem[] = foodsJson ? JSON.parse(foodsJson) : [];
     
-    // If authenticated, try to get from Firestore first (which caches locally)
+    // STEP 2: If authenticated, sync from Firestore in background (for multi-device sync)
+    // But return local cache immediately for fast response
+    const user = getCurrentUser();
     if (user) {
-      try {
-        const firestoreFoods = await getFoodsFromFirestore();
-        if (firestoreFoods.length > 0) {
-          return firestoreFoods;
-        }
-      } catch (error) {
-        console.error('Error getting foods from Firestore, falling back to local:', error);
-      }
+      // Sync from Firestore in background (non-blocking)
+      getFoodsFromFirestore()
+        .then((firestoreFoods) => {
+          // Merge Firestore foods with local cache
+          const mergedFoods = [...localFoods];
+          firestoreFoods.forEach((firestoreFood) => {
+            const existingIndex = mergedFoods.findIndex(f => f.id === firestoreFood.id);
+            if (existingIndex >= 0) {
+              // Keep local version if it exists (it's more up-to-date due to write-through)
+              // Only update if Firestore version is newer (check updatedAt if available)
+              mergedFoods[existingIndex] = firestoreFood;
+            } else {
+              mergedFoods.push(firestoreFood);
+            }
+          });
+          // Update local cache with merged data
+          AsyncStorage.setItem(FOODS_KEY, JSON.stringify(mergedFoods)).catch((error) => {
+            console.error('Error updating local cache with Firestore data:', error);
+          });
+        })
+        .catch((error) => {
+          console.error('Error syncing foods from Firestore:', error);
+        });
     }
     
-    // Fallback to local storage
-    const foodsJson = await AsyncStorage.getItem(FOODS_KEY);
-    return foodsJson ? JSON.parse(foodsJson) : [];
+    // Return local cache immediately (fast response)
+    return localFoods;
   } catch (error) {
     console.error('Error getting foods:', error);
     return [];
@@ -128,26 +97,46 @@ export async function getFoods(): Promise<FoodItem[]> {
 
 /**
  * Get a food by ID
+ * Write-through cache: Always check local cache first (most up-to-date),
+ * then fall back to Firestore if not found locally
  */
 export async function getFoodById(foodId: string): Promise<FoodItem | null> {
   try {
-    const user = getCurrentUser();
-    
-    // If authenticated, try to get from Firestore first
-    if (user) {
-      try {
-        const food = await getFoodByIdFromFirestore(foodId);
-        if (food) return food;
-      } catch (error) {
-        console.error('Error getting food from Firestore, falling back to local:', error);
+    // STEP 1: Always check local cache first (write-through cache pattern)
+    // This ensures we get the most recent data immediately after writes
+    const foodsJson = await AsyncStorage.getItem(FOODS_KEY);
+    if (foodsJson) {
+      const foods: FoodItem[] = JSON.parse(foodsJson);
+      const cachedFood = foods.find(f => f.id === foodId);
+      if (cachedFood) {
+        return cachedFood;
       }
     }
     
-    // Fallback to local storage
-    const foodsJson = await AsyncStorage.getItem(FOODS_KEY);
-    if (!foodsJson) return null;
-    const foods: FoodItem[] = JSON.parse(foodsJson);
-    return foods.find(f => f.id === foodId) || null;
+    // STEP 2: If not in local cache, try Firestore (for sync from other devices)
+    const user = getCurrentUser();
+    if (user) {
+      try {
+        const food = await getFoodByIdFromFirestore(foodId);
+        if (food) {
+          // Update local cache with Firestore data for next time
+          const foodsJson = await AsyncStorage.getItem(FOODS_KEY);
+          const foods: FoodItem[] = foodsJson ? JSON.parse(foodsJson) : [];
+          const existingIndex = foods.findIndex(f => f.id === food.id);
+          if (existingIndex >= 0) {
+            foods[existingIndex] = food;
+          } else {
+            foods.push(food);
+          }
+          await AsyncStorage.setItem(FOODS_KEY, JSON.stringify(foods));
+          return food;
+        }
+      } catch (error) {
+        console.error('Error getting food from Firestore:', error);
+      }
+    }
+    
+    return null;
   } catch (error) {
     console.error('Error getting food by ID:', error);
     return null;

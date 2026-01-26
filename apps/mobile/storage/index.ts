@@ -27,6 +27,7 @@ export {
   removeFoodFromToday,
   moveFoodToDate,
   updateFoodQuantityInDate,
+  updateFoodInLogEntry,
   getRecentFoods,
 } from './dailyLogs';
 

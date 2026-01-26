@@ -71,11 +71,19 @@ function areLogsDifferent(log1: DailyLog, log2: DailyLog): boolean {
 }
 
 /**
+ * Count total foods in a log
+ */
+function countFoodsInLog(log: DailyLog): number {
+  return log.meals.reduce((sum, meal) => sum + meal.foods.length, 0);
+}
+
+/**
  * Asynchronously check and update daily log from Firebase if different
  * This runs in the background and doesn't block the return value
  * 
  * IMPORTANT: This function checks if the local version has changed before updating
- * to avoid race conditions where user makes changes while sync is in progress
+ * to avoid race conditions where user makes changes while sync is in progress.
+ * It also prevents overwriting local deletions by checking if local has fewer foods.
  */
 async function updateLogFromFirebaseIfDifferent(log: DailyLog): Promise<void> {
   try {
@@ -84,6 +92,7 @@ async function updateLogFromFirebaseIfDifferent(log: DailyLog): Promise<void> {
 
     // Store a snapshot of the log we're comparing against
     const originalLogSnapshot = JSON.stringify(serializeDailyLog(log));
+    const originalFoodCount = countFoodsInLog(log);
 
     // Fetch the entire log from Firebase
     const firebaseLog = await getDailyLogFromFirestore(log.date);
@@ -103,6 +112,22 @@ async function updateLogFromFirebaseIfDifferent(log: DailyLog): Promise<void> {
           if (currentLocalSnapshot !== originalLogSnapshot) {
             console.log('[updateLogFromFirebaseIfDifferent] Local log changed during sync, skipping update to avoid overwriting user changes:', {
               date: log.date,
+            });
+            return;
+          }
+          
+          // Deserialize to check food count
+          const currentLocalDailyLog = deserializeDailyLog(currentLocalLog);
+          const currentLocalFoodCount = countFoodsInLog(currentLocalDailyLog);
+          const firebaseFoodCount = countFoodsInLog(firebaseLog);
+          
+          // If local has fewer foods than Firebase, it means a deletion happened locally
+          // Don't overwrite local deletions - wait for Firestore to sync the deletion first
+          if (currentLocalFoodCount < firebaseFoodCount) {
+            console.log('[updateLogFromFirebaseIfDifferent] Local log has fewer foods (deletion detected), skipping update to preserve local deletion:', {
+              date: log.date,
+              localFoodCount: currentLocalFoodCount,
+              firebaseFoodCount: firebaseFoodCount,
             });
             return;
           }
@@ -434,11 +459,38 @@ export async function removeFoodFromDate(date: string, mealId: string, foodIndex
       
       logs[date] = logToSave;
       await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
+      console.log(`[removeFoodFromDate] Saved log for ${date}, meals count:`, logToSave.meals.length, 
+        'total foods:', logToSave.meals.reduce((sum: number, m: any) => sum + m.foods.length, 0));
       
       // Invalidate recent foods cache since we removed a food
       invalidateRecentFoodsCache().catch((error) => {
         console.error('Error invalidating recent foods cache:', error);
       });
+      
+      // If authenticated, also save to Firestore (async, non-blocking)
+      const user = getCurrentUser();
+      if (user) {
+        // Firestore save happens after cache, but we don't wait for it to complete
+        // This ensures the UI is responsive even if Firestore is slow
+        // Convert logToSave back to DailyLog format (with Date objects for Firestore)
+        const dailyLog: DailyLog = {
+          date: logToSave.date,
+          meals: logToSave.meals.map((meal: any) => ({
+            ...meal,
+            timestamp: typeof meal.timestamp === 'string' ? new Date(meal.timestamp) : meal.timestamp,
+            foods: meal.foods.map((mealFood: any) => ({
+              ...mealFood,
+              addedAt: typeof mealFood.addedAt === 'string' ? new Date(mealFood.addedAt) : mealFood.addedAt,
+            })),
+          })),
+          totalMacros: logToSave.totalMacros,
+          targetMacros: logToSave.targetMacros,
+        };
+        saveDailyLogToFirestore(dailyLog).catch((error) => {
+          console.error('Error saving daily log to Firestore (will retry on sync):', error);
+          // Log is already in cache, so it will sync later
+        });
+      }
     }
   } catch (error) {
     console.error('Error removing food from date:', error);
@@ -576,6 +628,84 @@ export async function updateFoodQuantityInDate(date: string, mealId: string, foo
     }
   } catch (error) {
     console.error('Error updating food quantity:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update the food item in a specific log entry (only updates that log entry, not the global food)
+ * This allows editing a food for a specific day without affecting the food definition or other log entries
+ */
+export async function updateFoodInLogEntry(
+  date: string, 
+  mealId: string, 
+  foodIndex: number, 
+  updatedFood: FoodItem, 
+  newQuantity?: number
+): Promise<void> {
+  try {
+    console.log('[updateFoodInLogEntry] Updating food in log entry', { date, mealId, foodIndex, foodName: updatedFood.name, newQuantity });
+    
+    const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+    const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
+    
+    const dateLog = logs[date];
+    if (!dateLog) {
+      console.warn('[updateFoodInLogEntry] Log not found for date:', date);
+      return;
+    }
+    
+    // Deserialize the log to work with Date objects
+    const dailyLog = deserializeDailyLog(dateLog);
+    
+    // Find the meal and update the food at the specified index
+    const mealIndex = dailyLog.meals.findIndex((m: Meal) => m.id === mealId);
+    if (mealIndex >= 0 && dailyLog.meals[mealIndex].foods[foodIndex]) {
+      // Update the food object in this log entry only
+      dailyLog.meals[mealIndex].foods[foodIndex].food = updatedFood;
+      
+      // Update quantity if provided
+      if (newQuantity !== undefined) {
+        dailyLog.meals[mealIndex].foods[foodIndex].quantity = newQuantity;
+      }
+      
+      // Recalculate meal macros
+      dailyLog.meals[mealIndex].macros = calculateMacros(dailyLog.meals[mealIndex].foods);
+      
+      // Recalculate total macros for the day
+      const allMealFoods: MealFood[] = dailyLog.meals.flatMap((meal: Meal) => meal.foods);
+      dailyLog.totalMacros = calculateMacros(allMealFoods);
+      
+      // Convert Date objects to ISO strings for storage
+      const logToSave = serializeDailyLog(dailyLog);
+      
+      logs[date] = logToSave;
+      await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
+      console.log('[updateFoodInLogEntry] Successfully updated log entry');
+      
+      // If authenticated, also save to Firestore
+      const user = getCurrentUser();
+      if (user) {
+        const dailyLog: DailyLog = {
+          date: logToSave.date,
+          meals: logToSave.meals.map((meal: any) => ({
+            ...meal,
+            timestamp: typeof meal.timestamp === 'string' ? new Date(meal.timestamp) : meal.timestamp,
+            foods: meal.foods.map((mealFood: any) => ({
+              ...mealFood,
+              addedAt: typeof mealFood.addedAt === 'string' ? new Date(mealFood.addedAt) : mealFood.addedAt,
+            })),
+          })),
+          totalMacros: logToSave.totalMacros,
+          targetMacros: logToSave.targetMacros,
+        };
+        saveDailyLogToFirestore(dailyLog).catch((error) => {
+          console.error('Error saving daily log to Firestore:', error);
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error updating food in log entry:', error);
     throw error;
   }
 }
