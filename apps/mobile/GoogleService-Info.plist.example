@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyCUHFEtBB25X4-ioE5WAAY62MuFUEPNmjw</string>
+	<string>YOUR_FIREBASE_API_KEY</string>
 	<key>GCM_SENDER_ID</key>
-	<string>103020770618</string>
+	<string>YOUR_GCM_SENDER_ID</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.yaotime.mealplanner</string>
+	<string>YOUR_BUNDLE_ID</string>
 	<key>PROJECT_ID</key>
-	<string>meal-planner-e9881</string>
+	<string>YOUR_PROJECT_ID</string>
 	<key>STORAGE_BUCKET</key>
-	<string>meal-planner-e9881.firebasestorage.app</string>
+	<string>YOUR_STORAGE_BUCKET</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:103020770618:ios:ea63092c18d2dd54a5cc03</string>
+	<string>YOUR_GOOGLE_APP_ID</string>
 </dict>
 </plist>
