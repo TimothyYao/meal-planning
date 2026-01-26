@@ -41,4 +41,6 @@ export {
   getLastCarbs,
   saveLastFat,
   getLastFat,
+  saveLastDate,
+  getLastDate,
 } from './macros';

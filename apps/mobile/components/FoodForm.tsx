@@ -18,6 +18,8 @@ import {
   saveLastCarbs,
   getLastFat,
   saveLastFat,
+  getLastDate,
+  saveLastDate,
   generateFoodId,
 } from '../storage';
 import { ServingOption, ServingSizePicker } from './ServingSizePicker';
@@ -36,7 +38,7 @@ export const SERVING_OPTIONS: ServingOption[] = [
   { id: '100g', value: 100, unit: 'g', label: '100 g' },
 ];
 
-const DEFAULT_SERVING_ID = '100g';
+const DEFAULT_SERVING_ID = '1serving';
 
 interface FoodFormProps {
   initialFood?: FoodItem;
@@ -94,11 +96,15 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
   const [quantity, setQuantity] = useState(initialQuantity);
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate || new Date());
   const [calendarVisible, setCalendarVisible] = useState(false);
+  const [isLoadingLastDate, setIsLoadingLastDate] = useState(!initialDate && showDate);
   const [servingPickerExpanded, setServingPickerExpanded] = useState(false);
   const [showProteinPicker, setShowProteinPicker] = useState(false);
   const [showCarbsPicker, setShowCarbsPicker] = useState(false);
   const [showFatPicker, setShowFatPicker] = useState(false);
   const [showQuantityEditor, setShowQuantityEditor] = useState(false);
+  const [showProteinEditor, setShowProteinEditor] = useState(false);
+  const [showCarbsEditor, setShowCarbsEditor] = useState(false);
+  const [showFatEditor, setShowFatEditor] = useState(false);
   const [tempProteinValue, setTempProteinValue] = useState(0);
   const [tempCarbsValue, setTempCarbsValue] = useState(0);
   const [tempFatValue, setTempFatValue] = useState(0);
@@ -109,6 +115,9 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
 
   useEffect(() => {
     loadLastValues();
+    if (!initialDate && showDate) {
+      loadLastDate();
+    }
   }, []);
 
   useImperativeHandle(ref, () => ({
@@ -125,6 +134,19 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
     setLastSavedProtein(lastProtein);
     setLastSavedCarbs(lastCarbs);
     setLastSavedFat(lastFat);
+  };
+
+  const loadLastDate = async () => {
+    try {
+      const lastDate = await getLastDate();
+      if (lastDate) {
+        setSelectedDate(lastDate);
+      }
+    } catch (error) {
+      console.error('Error loading last date:', error);
+    } finally {
+      setIsLoadingLastDate(false);
+    }
   };
 
   const loadLastProtein = async () => {
@@ -229,6 +251,12 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
 
     const qty = parseFloat(quantity) || 1;
     const dateToUse = showDate ? selectedDate : undefined;
+    
+    // Save the date as the last used date if showDate is true
+    if (showDate && selectedDate) {
+      await saveLastDate(selectedDate);
+    }
+    
     await onSave(foodItem, qty, dateToUse);
   };
 
@@ -328,56 +356,86 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
 
         <View style={styles.macroRow}>
           <Text style={styles.macroLabel}>Protein (g)</Text>
-          <TouchableOpacity
-            style={styles.inputButton}
-            onPress={async () => {
-              const currentValue = parseFloat(protein) || 0;
-              setTempProteinValue(currentValue);
-              await loadLastProtein();
-              setShowProteinPicker(true);
-            }}
-          >
-            <Text style={[styles.input, styles.inputButtonText]}>
-              {protein || '0'}
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
-          </TouchableOpacity>
+          <View style={styles.macroInputContainer}>
+            <TouchableOpacity
+              style={styles.inputButton}
+              onPress={async () => {
+                const currentValue = parseFloat(protein) || 0;
+                setTempProteinValue(currentValue);
+                await loadLastProtein();
+                setShowProteinPicker(true);
+              }}
+            >
+              <Text style={[styles.input, styles.inputButtonText]}>
+                {protein || '0'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.penIconButton}
+              onPress={() => {
+                setShowProteinEditor(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.macroRow}>
           <Text style={styles.macroLabel}>Carbs (g)</Text>
-          <TouchableOpacity
-            style={styles.inputButton}
-            onPress={async () => {
-              const currentValue = parseFloat(carbs) || 0;
-              setTempCarbsValue(currentValue);
-              await loadLastCarbs();
-              setShowCarbsPicker(true);
-            }}
-          >
-            <Text style={[styles.input, styles.inputButtonText]}>
-              {carbs || '0'}
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
-          </TouchableOpacity>
+          <View style={styles.macroInputContainer}>
+            <TouchableOpacity
+              style={styles.inputButton}
+              onPress={async () => {
+                const currentValue = parseFloat(carbs) || 0;
+                setTempCarbsValue(currentValue);
+                await loadLastCarbs();
+                setShowCarbsPicker(true);
+              }}
+            >
+              <Text style={[styles.input, styles.inputButtonText]}>
+                {carbs || '0'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.penIconButton}
+              onPress={() => {
+                setShowCarbsEditor(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.macroRow}>
           <Text style={styles.macroLabel}>Fat (g)</Text>
-          <TouchableOpacity
-            style={styles.inputButton}
-            onPress={async () => {
-              const currentValue = parseFloat(fat) || 0;
-              setTempFatValue(currentValue);
-              await loadLastFat();
-              setShowFatPicker(true);
-            }}
-          >
-            <Text style={[styles.input, styles.inputButtonText]}>
-              {fat || '0'}
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
-          </TouchableOpacity>
+          <View style={styles.macroInputContainer}>
+            <TouchableOpacity
+              style={styles.inputButton}
+              onPress={async () => {
+                const currentValue = parseFloat(fat) || 0;
+                setTempFatValue(currentValue);
+                await loadLastFat();
+                setShowFatPicker(true);
+              }}
+            >
+              <Text style={[styles.input, styles.inputButtonText]}>
+                {fat || '0'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.penIconButton}
+              onPress={() => {
+                setShowFatEditor(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -569,7 +627,64 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
         max={999}
         title="Number of Servings"
         unit="servings"
-        keyboardType="decimal-pad"
+        keyboardType="numeric"
+        hideRange={true}
+      />
+
+      {/* Protein Editor Modal */}
+      <NumberEditor
+        visible={showProteinEditor}
+        value={parseFloat(protein) || 0}
+        onSave={async (value) => {
+          setProtein(value.toString());
+          await saveLastProtein(value);
+          await loadLastProtein();
+          setShowProteinEditor(false);
+        }}
+        onCancel={() => setShowProteinEditor(false)}
+        min={0}
+        max={1000}
+        title="Protein"
+        unit="g"
+        keyboardType="numeric"
+        hideRange={true}
+      />
+
+      {/* Carbs Editor Modal */}
+      <NumberEditor
+        visible={showCarbsEditor}
+        value={parseFloat(carbs) || 0}
+        onSave={async (value) => {
+          setCarbs(value.toString());
+          await saveLastCarbs(value);
+          await loadLastCarbs();
+          setShowCarbsEditor(false);
+        }}
+        onCancel={() => setShowCarbsEditor(false)}
+        min={0}
+        max={1000}
+        title="Carbs"
+        unit="g"
+        keyboardType="numeric"
+        hideRange={true}
+      />
+
+      {/* Fat Editor Modal */}
+      <NumberEditor
+        visible={showFatEditor}
+        value={parseFloat(fat) || 0}
+        onSave={async (value) => {
+          setFat(value.toString());
+          await saveLastFat(value);
+          await loadLastFat();
+          setShowFatEditor(false);
+        }}
+        onCancel={() => setShowFatEditor(false)}
+        min={0}
+        max={1000}
+        title="Fat"
+        unit="g"
+        keyboardType="numeric"
         hideRange={true}
       />
 
@@ -577,7 +692,10 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
         <CalendarPicker
           visible={calendarVisible}
           selectedDate={selectedDate}
-          onDateSelect={setSelectedDate}
+          onDateSelect={async (date) => {
+            setSelectedDate(date);
+            await saveLastDate(date);
+          }}
           onClose={() => setCalendarVisible(false)}
         />
       )}
@@ -639,6 +757,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.md,
+  },
+  macroInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  penIconButton: {
+    padding: spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   macroLabel: {
     fontSize: fontSize.base,

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MacroTargets, DailyLog } from '@meal-planning/shared';
 import { getCurrentUser } from '../utils/auth';
 import { saveDailyLogToFirestore, syncLocalCacheToFirestore, getUserProfileFromFirestore } from '../utils/firestore';
-import { DAILY_LOGS_KEY, LAST_PROTEIN_KEY, LAST_CARBS_KEY, LAST_FAT_KEY } from './constants';
+import { DAILY_LOGS_KEY, LAST_PROTEIN_KEY, LAST_CARBS_KEY, LAST_FAT_KEY, LAST_DATE_KEY } from './constants';
 import { getTodayDate } from './utils';
 
 /**
@@ -172,6 +172,40 @@ export async function getLastFat(): Promise<number | null> {
     return value ? parseFloat(value) : null;
   } catch (error) {
     console.error('Error getting last fat:', error);
+    return null;
+  }
+}
+
+/**
+ * Save last date used for adding foods
+ * Stored locally only (AsyncStorage), not synced to Firebase
+ */
+export async function saveLastDate(date: Date): Promise<void> {
+  try {
+    // Store as ISO string for easy parsing
+    await AsyncStorage.setItem(LAST_DATE_KEY, date.toISOString());
+  } catch (error) {
+    console.error('Error saving last date:', error);
+  }
+}
+
+/**
+ * Get last date used for adding foods
+ * Retrieved from local storage only (AsyncStorage), not from Firebase
+ */
+export async function getLastDate(): Promise<Date | null> {
+  try {
+    const value = await AsyncStorage.getItem(LAST_DATE_KEY);
+    if (value) {
+      const date = new Date(value);
+      // Validate the date
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting last date:', error);
     return null;
   }
 }

@@ -6,4 +6,5 @@ export const FOODS_KEY = '@meal_planning:foods';
 export const LAST_PROTEIN_KEY = '@meal_planning:last_protein';
 export const LAST_CARBS_KEY = '@meal_planning:last_carbs';
 export const LAST_FAT_KEY = '@meal_planning:last_fat';
+export const LAST_DATE_KEY = '@meal_planning:last_date';
 export const RECENT_FOODS_CACHE_KEY = '@meal_planning:recent_foods_cache';

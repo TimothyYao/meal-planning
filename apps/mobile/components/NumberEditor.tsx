@@ -3,7 +3,7 @@ import {
   StyleSheet,
   Text,
   View,
-  TouchableOpacity,
+  Pressable,
   Modal,
   TextInput,
   Alert,
@@ -20,7 +20,7 @@ export type NumberEditorProps = {
   title?: string;
   unit?: string;
   placeholder?: string;
-  keyboardType?: 'decimal-pad' | 'number-pad';
+  keyboardType?: 'decimal-pad' | 'number-pad' | 'numeric' | 'default';
   hideRange?: boolean;
 };
 
@@ -34,7 +34,7 @@ export function NumberEditor({
   title = 'Enter Value',
   unit,
   placeholder,
-  keyboardType = 'decimal-pad',
+  keyboardType,
   hideRange = false,
 }: NumberEditorProps) {
   const [editValue, setEditValue] = useState('');
@@ -65,6 +65,13 @@ export function NumberEditor({
   const placeholderValue = showPlaceholder ? displayPlaceholder : ' '; // Space character for centering
 
   const titleWithRange = hideRange ? title : `${title} (${min} - ${max})`;
+  
+  // Determine keyboard type - use 'numeric' if not specified to enable Done button
+  // 'numeric' supports decimals and has a Done button on iOS
+  const effectiveKeyboardType = keyboardType || 'numeric';
+  
+  // Only show return key on keyboards that support it
+  const supportsReturnKey = effectiveKeyboardType !== 'decimal-pad' && effectiveKeyboardType !== 'number-pad';
 
   return (
     <Modal
@@ -73,7 +80,7 @@ export function NumberEditor({
       animationType="fade"
       onRequestClose={onCancel}
     >
-      <View style={styles.modalOverlay}>
+      <Pressable style={styles.modalOverlay} onPress={onCancel}>
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>{titleWithRange}</Text>
           <View style={styles.inputWrapper}>
@@ -81,7 +88,10 @@ export function NumberEditor({
               style={[styles.editInput, unit != null && styles.editInputWithUnit]}
               value={editValue}
               onChangeText={setEditValue}
-              keyboardType={keyboardType}
+              keyboardType={effectiveKeyboardType}
+              returnKeyType={supportsReturnKey ? "done" : undefined}
+              onSubmitEditing={supportsReturnKey ? handleSave : undefined}
+              blurOnSubmit={supportsReturnKey}
               placeholder={placeholderValue}
               placeholderTextColor={showPlaceholder ? "#999" : "transparent"}
               autoFocus
@@ -96,22 +106,8 @@ export function NumberEditor({
               </View>
             )}
           </View>
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonCancel]}
-              onPress={onCancel}
-            >
-              <Text style={styles.modalButtonTextCancel}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonSave]}
-              onPress={handleSave}
-            >
-              <Text style={styles.modalButtonTextSave}>Save</Text>
-            </TouchableOpacity>
-          </View>
         </View>
-      </View>
+      </Pressable>
     </Modal>
   );
 }
@@ -140,7 +136,6 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     position: 'relative',
-    marginBottom: 20,
     minHeight: 56,
     justifyContent: 'center',
     alignItems: 'center',
@@ -178,33 +173,5 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#666',
     fontWeight: '500',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  modalButtonSave: {
-    backgroundColor: '#007AFF',
-  },
-  modalButtonTextCancel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-  },
-  modalButtonTextSave: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
   },
 });
