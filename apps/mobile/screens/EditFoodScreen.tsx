@@ -2,7 +2,7 @@ import { StyleSheet, Text, View, Alert, TouchableOpacity, ScrollView, ActivityIn
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useRef, useState } from 'react';
-import { FoodItem } from '@meal-planning/shared';
+import { FoodItem, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
 import { saveFood, getFoodById, updateFoodQuantityInDate, moveFoodToDate, getTodayDate } from '../storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
 import { safeGoBack } from '../utils/navigation';
@@ -157,7 +157,7 @@ export default function EditFoodScreen() {
           disabled={isSaving}
         >
           {isSaving ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={fontColor.inverse} />
           ) : (
             <Text style={styles.saveButtonText}>Save</Text>
           )}
@@ -170,33 +170,33 @@ export default function EditFoodScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.primary,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: 20,
+    padding: spacing.xl,
   },
   title: {
-    fontSize: 32,
+    fontSize: fontSize['4xl'],
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   bottomButtonContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.primary,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5ea',
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    borderTopColor: colors.border.medium,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
     justifyContent: 'flex-end',
-    shadowColor: '#000',
+    shadowColor: colors.background.inverse,
     shadowOffset: {
       width: 0,
       height: -1,
@@ -208,15 +208,15 @@ const styles = StyleSheet.create({
   saveButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     borderRadius: 10,
     paddingVertical: 14,
     paddingHorizontal: 32,
     minWidth: 100,
   },
   saveButtonText: {
-    color: '#fff',
-    fontSize: 17,
+    color: fontColor.inverse,
+    fontSize: fontSize.md,
     fontWeight: '600',
     letterSpacing: 0.3,
   },
@@ -226,11 +226,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderRadius: 10,
     paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing['2xl'],
   },
   cancelButtonText: {
-    color: '#007AFF',
-    fontSize: 17,
+    color: colors.primary,
+    fontSize: fontSize.md,
     fontWeight: '400',
   },
   buttonDisabled: {

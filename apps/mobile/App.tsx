@@ -14,6 +14,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
+import { colors } from '@meal-planning/shared';
 import { AuthProvider } from './contexts/AuthContext';
 import HomeScreen from './screens/HomeScreen';
 import AddFoodScreen from './screens/AddFoodScreen';
@@ -21,11 +23,36 @@ import ProfileScreen from './screens/ProfileScreen';
 import PhoneAuthScreen from './screens/PhoneAuthScreen';
 import FoodDetailScreen from './screens/FoodDetailScreen';
 import EditFoodScreen from './screens/EditFoodScreen';
+import FloatingAddMenu from './components/FloatingAddMenu';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 export const navigationRef = { current: null as NavigationContainerRef<any> | null };
+
+// Global state for floating add menu
+let setFloatingMenuVisible: ((visible: boolean) => void) | null = null;
+export const showFloatingAddMenu = () => {
+  if (setFloatingMenuVisible) {
+    setFloatingMenuVisible(true);
+  }
+};
+export const hideFloatingAddMenu = () => {
+  if (setFloatingMenuVisible) {
+    setFloatingMenuVisible(false);
+  }
+};
+
+// Global refresh callback for HomeScreen
+let refreshHomeScreen: (() => void) | null = null;
+export const setRefreshHomeScreen = (callback: (() => void) | null) => {
+  refreshHomeScreen = callback;
+};
+export const triggerHomeScreenRefresh = () => {
+  if (refreshHomeScreen) {
+    refreshHomeScreen();
+  }
+};
 
 function HomeStack() {
   return (
@@ -59,8 +86,8 @@ function TabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.secondary,
       }}
     >
       <Tab.Screen
@@ -87,11 +114,7 @@ function TabNavigator() {
         listeners={({ navigation }) => ({
           tabPress: (e) => {
             e.preventDefault();
-            const root = navigation.getParent();
-            if (root) (root as any).navigate('AddFood');
-            else if (navigationRef.current)
-              navigationRef.current.navigate('AddFood' as never);
-            else (navigation as any).navigate('AddFood');
+            showFloatingAddMenu();
           },
         })}
       />
@@ -128,13 +151,25 @@ const linking = {
           Profile: 'profile',
         },
       },
-      AddFood: 'add-food',
+      AddFood: 'add-food/custom',
       PhoneAuth: 'phone-auth',
     },
   },
 };
 
 export default function App() {
+  const [floatingMenuVisible, setFloatingMenuVisibleState] = useState(false);
+  
+  // Set the global function to control menu visibility
+  setFloatingMenuVisible = setFloatingMenuVisibleState;
+
+  const handleCustomFood = () => {
+    hideFloatingAddMenu();
+    if (navigationRef.current) {
+      navigationRef.current.navigate('AddFood' as never);
+    }
+  };
+
   return (
     <AuthProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -169,6 +204,11 @@ export default function App() {
               />
             </Stack.Navigator>
           </NavigationContainer>
+          <FloatingAddMenu
+            visible={floatingMenuVisible}
+            onClose={() => setFloatingMenuVisibleState(false)}
+            onCustomFood={handleCustomFood}
+          />
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </AuthProvider>

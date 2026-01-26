@@ -5,10 +5,11 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { DailyLog, formatMacroValue, MealFood } from '@meal-planning/shared';
+import { DailyLog, formatMacroValue, MealFood, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
 import { getLogForDate, removeFoodFromDate } from '../storage';
 import FoodItem from '../components/FoodItem';
 import CalendarPicker from '../components/CalendarPicker';
+import { setRefreshHomeScreen } from '../App';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -60,6 +61,16 @@ export default function HomeScreen() {
       return () => clearTimeout(timer);
     }, [loadDateLog])
   );
+
+  // Register refresh callback for external triggers (e.g., from FloatingAddMenu)
+  useEffect(() => {
+    setRefreshHomeScreen(() => {
+      loadDateLog();
+    });
+    return () => {
+      setRefreshHomeScreen(null);
+    };
+  }, [loadDateLog]);
 
   const isToday = (date: Date): boolean => {
     const today = new Date();
@@ -251,7 +262,7 @@ export default function HomeScreen() {
           onPress={goToPreviousDay}
           style={styles.dateNavButton}
         >
-          <Ionicons name="chevron-back" size={24} color="#007AFF" />
+          <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         
         <TouchableOpacity
@@ -274,7 +285,7 @@ export default function HomeScreen() {
           onPress={goToNextDay}
           style={styles.dateNavButton}
         >
-          <Ionicons name="chevron-forward" size={24} color="#007AFF" />
+          <Ionicons name="chevron-forward" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -318,7 +329,7 @@ export default function HomeScreen() {
                       }),
                       backgroundColor: caloriesProgress.interpolate({
                         inputRange: [0, 100, 101],
-                        outputRange: ['#34c759', '#34c759', '#ff3b30'],
+                        outputRange: [colors.status.success, colors.status.success, colors.status.error],
                       }),
                     },
                   ]}
@@ -479,114 +490,114 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.primary,
   },
   content: {
-    padding: 20,
+    padding: spacing.xl,
   },
   title: {
-    fontSize: 28,
+    fontSize: fontSize['3xl'],
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: spacing['2xl'],
   },
   dateNavButton: {
-    padding: 8,
+    padding: spacing.sm,
   },
   dateTextContainer: {
     flex: 1,
     alignItems: 'center',
-    marginHorizontal: 12,
+    marginHorizontal: spacing.md,
   },
   dateText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: fontSize.base,
+    color: fontColor.tertiary,
     textAlign: 'center',
   },
   loadingText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: fontSize.base,
+    color: fontColor.tertiary,
     textAlign: 'center',
-    marginTop: 40,
+    marginTop: spacing['4xl'],
   },
   section: {
-    marginBottom: 30,
+    marginBottom: spacing['3xl'],
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: fontSize.xl,
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   macroRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 12,
+    gap: spacing.md,
+    marginTop: spacing.md,
   },
   macroCard: {
     flex: 1,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: colors.background.secondary,
     borderRadius: 12,
-    padding: 16,
+    padding: spacing.lg,
   },
   macroHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   macroLabel: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: fontSize.sm,
+    color: fontColor.tertiary,
     fontWeight: '500',
   },
   macroProgress: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: fontSize.xs,
+    color: fontColor.tertiary,
     fontWeight: '600',
   },
   macroValues: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   macroValue: {
-    fontSize: 20,
+    fontSize: fontSize.xl,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: colors.primary,
   },
   macroSeparator: {
-    fontSize: 16,
-    color: '#999',
-    marginHorizontal: 8,
+    fontSize: fontSize.base,
+    color: fontColor.quaternary,
+    marginHorizontal: spacing.sm,
   },
   macroTarget: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: fontSize.base,
+    color: fontColor.tertiary,
     fontWeight: '500',
   },
   progressText: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
+    fontSize: fontSize.xs,
+    color: fontColor.tertiary,
+    marginTop: spacing.xs,
   },
   progressBar: {
     width: '100%',
     height: 6,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: colors.border.light,
     borderRadius: 3,
     overflow: 'hidden',
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#34c759',
+    backgroundColor: colors.status.success,
     borderRadius: 3,
   },
 });

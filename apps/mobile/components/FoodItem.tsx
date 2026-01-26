@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Animated, Pressable } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { MealFood, formatMacroValue } from '@meal-planning/shared';
+import { MealFood, formatMacroValue, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
 
 interface FoodItemProps {
   mealFood: MealFood;
@@ -168,11 +168,11 @@ export default function FoodItem({
 
 const styles = StyleSheet.create({
   foodItem: {
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    backgroundColor: colors.background.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.background.tertiary,
   },
   foodInfo: {
     flexDirection: 'row',
@@ -181,26 +181,26 @@ const styles = StyleSheet.create({
   },
   foodDetails: {
     flex: 1,
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   foodName: {
-    fontSize: 16,
+    fontSize: fontSize.base,
     flex: 1,
   },
   foodServing: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+    fontSize: fontSize.sm,
+    color: fontColor.tertiary,
+    marginTop: spacing.xs,
   },
   foodTime: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: fontSize.xs,
+    color: fontColor.quaternary,
     marginTop: 2,
   },
   foodRightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   macroCompact: {
     flexDirection: 'column',
@@ -212,39 +212,39 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   macroCompactCalories: {
-    fontSize: 12,
+    fontSize: fontSize.xs,
     fontWeight: '500',
   },
   macroCompactNumber: {
-    color: '#007AFF',
+    color: colors.primary,
   },
   macroCompactCalorieNumber: {
-    color: '#666',
+    color: fontColor.tertiary,
   },
   macroCompactLabel: {
-    color: '#666',
+    color: fontColor.tertiary,
   },
   deleteContainer: {
     width: 100,
     justifyContent: 'center',
     alignItems: 'flex-end',
-    backgroundColor: '#ff3b30',
+    backgroundColor: colors.cancel,
   },
   deleteButton: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     width: 100,
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
   },
   deleteButtonContent: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   deleteText: {
-    color: '#fff',
-    fontSize: 12,
+    color: fontColor.inverse,
+    fontSize: fontSize.xs,
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
 });

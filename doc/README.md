@@ -27,6 +27,7 @@ User stories are organized by feature category:
 
 - [Architecture](./architecture.md) - Current tech stack and future considerations
 - [Data Models](./data-models.md) - Core entities and data structures
+- [Design System](./design-system.md) - Style tokens and design guidelines
 - [Success Metrics](./success-metrics.md) - KPIs and measurement criteria
 - [Future Considerations](./future-considerations.md) - Additional ideas and opportunities
 

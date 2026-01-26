@@ -18,6 +18,8 @@
 - **Language**: TypeScript
 - **Module System**: ES modules
 - **Build**: TypeScript compiler
+- **Design System**: Centralized style tokens (spacing, colors, typography)
+  - See [Design System Documentation](./design-system.md) for details
 
 ### Monorepo Structure
 - **Workspace Manager**: npm workspaces

@@ -26,6 +26,7 @@ export {
   removeFoodFromToday,
   moveFoodToDate,
   updateFoodQuantityInDate,
+  getRecentFoods,
 } from './dailyLogs';
 
 // Macro operations

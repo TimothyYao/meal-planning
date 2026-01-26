@@ -5,7 +5,7 @@ import {
   saveDailyLogToFirestore,
   getDailyLogFromFirestore,
 } from '../utils/firestore';
-import { DAILY_LOGS_KEY } from './constants';
+import { DAILY_LOGS_KEY, RECENT_FOODS_CACHE_KEY } from './constants';
 import { generateFoodId, getTodayDate } from './utils';
 
 /**
@@ -63,6 +63,11 @@ export async function addFoodToDate(food: FoodItem, quantity: number = 1, date: 
     await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
     console.log(`[addFoodToDate] Saved log for ${date}, meals count:`, logToSave.meals.length, 
       'total foods:', logToSave.meals.reduce((sum: number, m: any) => sum + m.foods.length, 0));
+    
+    // Invalidate recent foods cache since we added a new food
+    invalidateRecentFoodsCache().catch((error) => {
+      console.error('Error invalidating recent foods cache:', error);
+    });
     
     // If authenticated, also save to Firestore (async, non-blocking)
     const user = getCurrentUser();
@@ -245,6 +250,11 @@ export async function removeFoodFromDate(date: string, mealId: string, foodIndex
       
       logs[date] = logToSave;
       await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
+      
+      // Invalidate recent foods cache since we removed a food
+      invalidateRecentFoodsCache().catch((error) => {
+        console.error('Error invalidating recent foods cache:', error);
+      });
     }
   } catch (error) {
     console.error('Error removing food from date:', error);
@@ -337,6 +347,11 @@ export async function moveFoodToDate(fromDate: string, toDate: string, mealId: s
       }
       
       await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logsToSave));
+      
+      // Invalidate recent foods cache since we moved a food (which updates its addedAt timestamp)
+      invalidateRecentFoodsCache().catch((error) => {
+        console.error('Error invalidating recent foods cache:', error);
+      });
     }
   } catch (error) {
     console.error('Error moving food to date:', error);
@@ -376,5 +391,124 @@ export async function updateFoodQuantityInDate(date: string, mealId: string, foo
   } catch (error) {
     console.error('Error updating food quantity:', error);
     throw error;
+  }
+}
+
+/**
+ * Get recent foods sorted by when they were last added to a meal
+ * Returns an array of unique foods with their last added timestamp
+ * Uses cache for fast retrieval
+ */
+export async function getRecentFoods(limit: number = 10): Promise<Array<{ food: FoodItem; lastAdded: Date }>> {
+  try {
+    // Try to get from cache first - this should be very fast
+    const cacheJson = await AsyncStorage.getItem(RECENT_FOODS_CACHE_KEY);
+    if (cacheJson) {
+      try {
+        const cached = JSON.parse(cacheJson);
+        // Validate cache structure
+        if (Array.isArray(cached) && cached.length > 0) {
+          // Convert ISO strings back to Date objects
+          const recentFoods = cached.map((item: any) => ({
+            food: item.food,
+            lastAdded: new Date(item.lastAdded),
+          }));
+          // Return cached data immediately
+          return recentFoods.slice(0, limit);
+        }
+      } catch (cacheError) {
+        console.error('Error parsing recent foods cache:', cacheError);
+        // Fall through to rebuild cache
+      }
+    }
+    
+    // Cache miss or invalid - rebuild from daily logs
+    const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+    if (!logsJson) return [];
+    
+    const logs: Record<string, any> = JSON.parse(logsJson);
+    const foodMap = new Map<string, { food: FoodItem; lastAdded: Date }>();
+    
+    // Iterate through all daily logs
+    for (const date in logs) {
+      const log = logs[date];
+      if (!log || !log.meals || !Array.isArray(log.meals)) continue;
+      
+      // Iterate through all meals
+      for (const meal of log.meals) {
+        if (!meal.foods || !Array.isArray(meal.foods)) continue;
+        
+        // Iterate through all foods in the meal
+        for (const mealFood of meal.foods) {
+          if (!mealFood.food || !mealFood.food.id) continue;
+          
+          const foodId = mealFood.food.id;
+          const addedAt = mealFood.addedAt 
+            ? (typeof mealFood.addedAt === 'string' ? new Date(mealFood.addedAt) : mealFood.addedAt)
+            : (meal.timestamp 
+                ? (typeof meal.timestamp === 'string' ? new Date(meal.timestamp) : meal.timestamp)
+                : new Date());
+          
+          // If we haven't seen this food, or this is a more recent addition
+          if (!foodMap.has(foodId) || foodMap.get(foodId)!.lastAdded < addedAt) {
+            foodMap.set(foodId, {
+              food: mealFood.food,
+              lastAdded: addedAt,
+            });
+          }
+        }
+      }
+    }
+    
+    // Convert map to array, sort by lastAdded (most recent first), and limit
+    const recentFoods = Array.from(foodMap.values())
+      .sort((a, b) => b.lastAdded.getTime() - a.lastAdded.getTime())
+      .slice(0, Math.max(limit, 10)); // Cache more than requested for faster future queries
+    
+    // Update cache for next time (async, don't wait - fire and forget)
+    updateRecentFoodsCache(recentFoods).catch((error) => {
+      console.error('Error updating recent foods cache:', error);
+    });
+    
+    // Return only the requested limit
+    return recentFoods.slice(0, limit);
+  } catch (error) {
+    console.error('Error getting recent foods:', error);
+    return [];
+  }
+}
+
+/**
+ * Update the recent foods cache
+ * This is called asynchronously and doesn't block the main thread
+ */
+async function updateRecentFoodsCache(recentFoods: Array<{ food: FoodItem; lastAdded: Date }>): Promise<void> {
+  try {
+    // Convert Date objects to ISO strings for storage
+    const cacheData = recentFoods.map((item) => ({
+      food: item.food,
+      lastAdded: item.lastAdded.toISOString(),
+    }));
+    const cacheJson = JSON.stringify(cacheData);
+    // Use setItem which is async but we don't wait for it
+    AsyncStorage.setItem(RECENT_FOODS_CACHE_KEY, cacheJson).catch((error) => {
+      console.error('Error updating recent foods cache:', error);
+    });
+  } catch (error) {
+    console.error('Error preparing recent foods cache:', error);
+  }
+}
+
+/**
+ * Invalidate and rebuild the recent foods cache
+ * Call this when foods are added/removed to keep cache in sync
+ */
+export async function invalidateRecentFoodsCache(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(RECENT_FOODS_CACHE_KEY);
+    // Optionally rebuild cache immediately
+    await getRecentFoods(10);
+  } catch (error) {
+    console.error('Error invalidating recent foods cache:', error);
   }
 }

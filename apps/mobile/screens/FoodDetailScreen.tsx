@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { FoodItem, formatMacroValue } from '@meal-planning/shared';
+import { FoodItem, formatMacroValue, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
 import { saveFood, addFoodToDate, generateFoodId, getFoodById, getTodayDate } from '../storage';
 import { safeGoBack } from '../utils/navigation';
 
@@ -266,7 +266,7 @@ export default function FoodDetailScreen() {
       <View style={[styles.bottomButtonContainer, { paddingBottom: insets.bottom + 16 }]}>
         <TouchableOpacity style={styles.navTile} onPress={handleEdit} activeOpacity={0.7}>
           <View style={styles.tileIconContainer}>
-            <Ionicons name="pencil" size={24} color="#007AFF" />
+            <Ionicons name="pencil" size={24} color={colors.primary} />
           </View>
           <Text style={styles.tileText}>Edit</Text>
         </TouchableOpacity>
@@ -282,9 +282,9 @@ export default function FoodDetailScreen() {
         >
           <View style={styles.tileIconContainer}>
             {isCopying ? (
-              <ActivityIndicator size="small" color="#007AFF" />
+              <ActivityIndicator size="small" color={colors.primary} />
             ) : (
-              <Ionicons name="copy" size={24} color="#007AFF" />
+              <Ionicons name="copy" size={24} color={colors.primary} />
             )}
           </View>
           <Text style={styles.tileText}>{isCopying ? 'Copying...' : 'Copy'}</Text>
@@ -292,7 +292,7 @@ export default function FoodDetailScreen() {
 
         <TouchableOpacity style={styles.navTile} onPress={handleBack} activeOpacity={0.7}>
           <View style={styles.tileIconContainer}>
-            <Ionicons name="arrow-back" size={24} color="#666" />
+            <Ionicons name="arrow-back" size={24} color={fontColor.tertiary} />
           </View>
           <Text style={[styles.tileText, styles.tileTextSecondary]}>Back</Text>
         </TouchableOpacity>
@@ -304,89 +304,89 @@ export default function FoodDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.primary,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: 20,
+    padding: spacing.xl,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: spacing['2xl'],
   },
   title: {
-    fontSize: 32,
+    fontSize: fontSize['4xl'],
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   quantity: {
-    fontSize: 18,
-    color: '#666',
+    fontSize: fontSize.lg,
+    color: fontColor.tertiary,
   },
   addedTime: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 4,
+    fontSize: fontSize.sm,
+    color: fontColor.quaternary,
+    marginTop: spacing.xs,
   },
   section: {
-    marginBottom: 30,
+    marginBottom: spacing['3xl'],
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: fontSize.xl,
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.background.tertiary,
   },
   infoLabel: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: fontSize.base,
+    color: fontColor.tertiary,
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: '500',
-    color: '#333',
+    color: fontColor.secondary,
   },
   macroCard: {
-    backgroundColor: '#f9f9f9',
+    backgroundColor: colors.background.secondary,
     borderRadius: 12,
-    padding: 16,
+    padding: spacing.lg,
   },
   macroRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
   },
   macroLabel: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: fontSize.base,
+    color: fontColor.tertiary,
   },
   macroValue: {
-    fontSize: 18,
+    fontSize: fontSize.lg,
     fontWeight: '600',
-    color: '#007AFF',
+    color: colors.primary,
   },
   bottomButtonContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.primary,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    borderTopColor: colors.border.light,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl,
     flexDirection: 'row',
-    gap: 12,
-    shadowColor: '#000',
+    gap: spacing.md,
+    shadowColor: colors.background.inverse,
     shadowOffset: {
       width: 0,
       height: -2,
@@ -399,27 +399,27 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: colors.background.secondary,
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
     minHeight: 80,
   },
   navTileDisabled: {
     opacity: 0.6,
   },
   tileIconContainer: {
-    marginBottom: 8,
+    marginBottom: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tileText: {
-    fontSize: 14,
+    fontSize: fontSize.sm,
     fontWeight: '600',
-    color: '#007AFF',
+    color: colors.primary,
     textAlign: 'center',
   },
   tileTextSecondary: {
-    color: '#666',
+    color: fontColor.tertiary,
   },
 });

@@ -161,3 +161,6 @@ export interface StorageAdapter {
   clear(): Promise<void>;
 }
 
+// Design tokens
+export * from './tokens';
+

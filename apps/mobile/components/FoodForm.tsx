@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { FoodItem, MacroTargets } from '@meal-planning/shared';
+import { FoodItem, MacroTargets, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
 import { 
   getLastProtein, 
   saveLastProtein,
@@ -264,7 +264,7 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
                     day: 'numeric',
                   })}
             </Text>
-            <Ionicons name="calendar-outline" size={20} color="#007AFF" />
+            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
         </View>
       )}
@@ -291,7 +291,7 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
                 <Text style={[styles.input, styles.inputButtonText]}>
                   {parseFloat(quantity) || 1}
                 </Text>
-                <Ionicons name="chevron-forward" size={20} color="#999" />
+                <Ionicons name="chevron-forward" size={20} color={fontColor.quaternary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -406,7 +406,7 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
               onPress={() => setShowProteinPicker(false)}
               style={styles.modalCloseButton}
             >
-              <Ionicons name="close" size={28} color="#333" />
+              <Ionicons name="close" size={28} color={fontColor.secondary} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Select Protein</Text>
             <View style={styles.modalHeaderSpacer} />
@@ -460,7 +460,7 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
               onPress={() => setShowCarbsPicker(false)}
               style={styles.modalCloseButton}
             >
-              <Ionicons name="close" size={28} color="#333" />
+              <Ionicons name="close" size={28} color={fontColor.secondary} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Select Carbs</Text>
             <View style={styles.modalHeaderSpacer} />
@@ -515,7 +515,7 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
               onPress={() => setShowFatPicker(false)}
               style={styles.modalCloseButton}
             >
-              <Ionicons name="close" size={28} color="#333" />
+              <Ionicons name="close" size={28} color={fontColor.secondary} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Select Fat</Text>
             <View style={styles.modalHeaderSpacer} />
@@ -588,44 +588,44 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.primary,
   },
   content: {
-    padding: 20,
+    padding: spacing.xl,
   },
   contentNoPadding: {
     padding: 0,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: spacing['2xl'],
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: fontSize.lg,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   label: {
-    fontSize: 16,
-    marginBottom: 8,
+    fontSize: fontSize.base,
+    marginBottom: spacing.sm,
     fontWeight: '500',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border.medium,
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    padding: spacing.md,
+    fontSize: fontSize.base,
+    backgroundColor: colors.background.secondary,
   },
   inputButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border.medium,
     borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
+    padding: spacing.md,
+    backgroundColor: colors.background.secondary,
     minWidth: 100,
   },
   inputButtonText: {
@@ -638,57 +638,57 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   macroLabel: {
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: '500',
-    color: '#000',
+    color: fontColor.primary,
     flex: 1,
   },
   caloriesValue: {
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: '500',
-    color: '#333',
+    color: fontColor.secondary,
     textAlign: 'right',
     minWidth: 100,
   },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     borderRadius: 8,
-    padding: 16,
+    padding: spacing.lg,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: spacing.xl,
   },
   saveButtonDisabled: {
     opacity: 0.6,
   },
   saveButtonText: {
-    color: '#fff',
-    fontSize: 18,
+    color: fontColor.inverse,
+    fontSize: fontSize.lg,
     fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.primary,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: spacing.xl,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: colors.border.light,
   },
   modalCloseButton: {
-    padding: 8,
+    padding: spacing.sm,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: fontSize.xl,
     fontWeight: '600',
-    color: '#333',
+    color: fontColor.secondary,
   },
   modalHeaderSpacer: {
     width: 44,
@@ -696,91 +696,91 @@ const styles = StyleSheet.create({
   modalContent: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
   },
   modalFooter: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingBottom: 40,
-    paddingTop: 20,
-    gap: 12,
+    paddingTop: spacing.xl,
+    gap: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: colors.border.light,
   },
   modalCancelButton: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: spacing.lg,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border.medium,
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: colors.background.secondary,
   },
   modalCancelText: {
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: '600',
-    color: '#666',
+    color: fontColor.tertiary,
   },
   modalDoneButton: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: spacing.lg,
     borderRadius: 8,
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     alignItems: 'center',
   },
   modalDoneText: {
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: '600',
-    color: '#fff',
+    color: fontColor.inverse,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.background.tertiary,
   },
   infoLabel: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: fontSize.base,
+    color: fontColor.tertiary,
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: '500',
-    color: '#333',
+    color: fontColor.secondary,
   },
   quantityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: colors.background.secondary,
     borderRadius: 8,
-    padding: 12,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border.medium,
   },
   dateButtonText: {
-    fontSize: 16,
-    color: '#000',
+    fontSize: fontSize.base,
+    color: fontColor.primary,
   },
   twoColumnRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
   },
   column: {
     flex: 1,
   },
   columnLabel: {
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: '500',
-    color: '#000',
-    marginBottom: 8,
+    color: fontColor.primary,
+    marginBottom: spacing.sm,
   },
 });
 

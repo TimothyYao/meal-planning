@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import { UserProfile, MacroTargets, formatMacroValue, calculateCaloriesFromMacros } from '@meal-planning/shared';
+import { UserProfile, MacroTargets, formatMacroValue, calculateCaloriesFromMacros, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
 import { getTodayLog, setTodayTargetMacros } from '../storage';
 import { NumberEditor } from '../components/NumberEditor';
 import { Picker } from '@react-native-picker/picker';
@@ -518,7 +518,7 @@ export default function ProfileScreen() {
               contentFit="cover"
             />
           ) : (
-            <Ionicons name="person" size={80} color="#666" />
+            <Ionicons name="person" size={80} color={fontColor.tertiary} />
           )}
         </TouchableOpacity>
         {user ? (
@@ -590,7 +590,7 @@ export default function ProfileScreen() {
               onPress={() => navigation.getParent()?.navigate('PhoneAuth' as never)}
               disabled={authLoading}
             >
-              <Ionicons name="call" size={20} color="#fff" />
+              <Ionicons name="call" size={20} color={fontColor.inverse} />
               <Text style={styles.phoneAuthButtonText}>Sign in with phone</Text>
             </TouchableOpacity>
           </>
@@ -602,7 +602,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Daily Macro Targets</Text>
           {!isEditing ? (
             <TouchableOpacity onPress={handleEdit} style={styles.editButton}>
-              <Ionicons name="pencil" size={20} color="#007AFF" />
+              <Ionicons name="pencil" size={20} color={colors.primary} />
             </TouchableOpacity>
           ) : (
             <View style={styles.editActions}>
@@ -633,7 +633,7 @@ export default function ProfileScreen() {
                         <Text style={styles.autoCalcIndicator}> (auto)</Text>
                       )}
                     </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#007AFF" />
+                    <Ionicons name="chevron-forward" size={18} color={colors.primary} />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -649,7 +649,7 @@ export default function ProfileScreen() {
                   <Text style={styles.inputLabel}>Protein (g)</Text>
                   <View style={styles.macroInputValueRow}>
                     <Text style={styles.numberPickerValue}>{Math.round(protein)}</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#007AFF" />
+                    <Ionicons name="chevron-forward" size={18} color={colors.primary} />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -662,7 +662,7 @@ export default function ProfileScreen() {
                   <Text style={styles.inputLabel}>Carbs (g)</Text>
                   <View style={styles.macroInputValueRow}>
                     <Text style={styles.numberPickerValue}>{Math.round(carbs)}</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#007AFF" />
+                    <Ionicons name="chevron-forward" size={18} color={colors.primary} />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -675,7 +675,7 @@ export default function ProfileScreen() {
                   <Text style={styles.inputLabel}>Fat (g)</Text>
                   <View style={styles.macroInputValueRow}>
                     <Text style={styles.numberPickerValue}>{Math.round(fat)}</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#007AFF" />
+                    <Ionicons name="chevron-forward" size={18} color={colors.primary} />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -768,7 +768,7 @@ export default function ProfileScreen() {
           <Text style={styles.infoLabel}>Age:</Text>
           <View style={styles.infoValueRow}>
             <Text style={styles.infoValue}>{age !== null ? `${age} years` : 'Tap to set'}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#007AFF" />
+            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
           </View>
         </TouchableOpacity>
 
@@ -780,7 +780,7 @@ export default function ProfileScreen() {
           <Text style={styles.infoLabel}>Height:</Text>
           <View style={styles.infoValueRow}>
             <Text style={styles.infoValue}>{height !== null ? `${height} cm` : 'Tap to set'}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#007AFF" />
+            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
           </View>
         </TouchableOpacity>
 
@@ -792,7 +792,7 @@ export default function ProfileScreen() {
           <Text style={styles.infoLabel}>Weight:</Text>
           <View style={styles.infoValueRow}>
             <Text style={styles.infoValue}>{weight !== null ? `${weight} kg` : 'Tap to set'}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#007AFF" />
+            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
           </View>
         </TouchableOpacity>
 
@@ -815,7 +815,7 @@ export default function ProfileScreen() {
                 ? `${goal.charAt(0).toUpperCase() + goal.slice(1)} weight`
                 : 'Tap to set'}
             </Text>
-            <Ionicons name="chevron-forward" size={18} color="#007AFF" />
+            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
           </View>
         </TouchableOpacity>
 
@@ -884,44 +884,44 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.primary,
   },
   content: {
-    padding: 20,
+    padding: spacing.xl,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 30,
-    paddingBottom: 20,
+    marginBottom: spacing['3xl'],
+    paddingBottom: spacing.xl,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: colors.border.light,
   },
   phoneAuthButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
     borderRadius: 12,
-    marginTop: 16,
+    marginTop: spacing.lg,
   },
   phoneAuthButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: fontColor.inverse,
+    fontSize: fontSize.base,
     fontWeight: '600',
   },
   profilePictureContainer: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.background.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
     borderWidth: 3,
-    borderColor: '#e0e0e0',
+    borderColor: colors.border.light,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -930,81 +930,81 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   title: {
-    fontSize: 28,
+    fontSize: fontSize['3xl'],
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   name: {
-    fontSize: 22,
+    fontSize: fontSize['2xl'],
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   email: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: fontSize.base,
+    color: fontColor.tertiary,
   },
   section: {
-    marginBottom: 30,
+    marginBottom: spacing['3xl'],
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: fontSize.xl,
     fontWeight: '600',
   },
   editButton: {
-    padding: 8,
+    padding: spacing.sm,
   },
   editActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
   },
   cancelButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border.medium,
   },
   cancelButtonText: {
-    color: '#666',
-    fontSize: 16,
+    color: fontColor.tertiary,
+    fontSize: fontSize.base,
     fontWeight: '500',
   },
   saveButtonSmall: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: 8,
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
   },
   saveButtonTextSmall: {
-    color: '#fff',
-    fontSize: 16,
+    color: fontColor.inverse,
+    fontSize: fontSize.base,
     fontWeight: '600',
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.background.tertiary,
   },
   infoLabel: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: fontSize.base,
+    color: fontColor.tertiary,
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: '500',
   },
   infoValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   pickerModal: {
     position: 'absolute',
@@ -1017,30 +1017,30 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   pickerContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.primary,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingBottom: 20,
+    paddingBottom: spacing.xl,
   },
   pickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: colors.border.light,
   },
   pickerTitle: {
-    fontSize: 18,
+    fontSize: fontSize.lg,
     fontWeight: '600',
   },
   pickerCloseButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   pickerCloseText: {
-    color: '#007AFF',
-    fontSize: 16,
+    color: colors.primary,
+    fontSize: fontSize.base,
     fontWeight: '600',
   },
   picker: {
@@ -1049,32 +1049,32 @@ const styles = StyleSheet.create({
   macroRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: spacing.md,
   },
   macroCard: {
     flex: 1,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: colors.background.secondary,
     borderRadius: 12,
-    padding: 16,
+    padding: spacing.lg,
     alignItems: 'center',
   },
   macroValue: {
-    fontSize: 20,
+    fontSize: fontSize.xl,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   macroLabel: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: fontSize.sm,
+    color: fontColor.tertiary,
   },
   inputRow: {
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   macroInputRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 20,
+    gap: spacing.md,
+    marginBottom: spacing.xl,
   },
   macroInputContainer: {
     flex: 1,
@@ -1082,10 +1082,10 @@ const styles = StyleSheet.create({
   macroInputButton: {
     flex: 1,
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: colors.primary,
     borderRadius: 12,
     backgroundColor: '#f0f7ff',
-    shadowColor: '#007AFF',
+    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1095,27 +1095,27 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   macroInputButtonContent: {
-    padding: 16,
+    padding: spacing.lg,
   },
   macroInputValueRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   inputLabel: {
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: '500',
-    marginBottom: 8,
-    color: '#333',
+    marginBottom: spacing.sm,
+    color: fontColor.secondary,
   },
   numberPickerButton: {
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: colors.primary,
     borderRadius: 12,
-    padding: 16,
+    padding: spacing.lg,
     backgroundColor: '#f0f7ff',
-    shadowColor: '#007AFF',
+    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1125,71 +1125,71 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   numberPickerValue: {
-    fontSize: 18,
+    fontSize: fontSize.lg,
     fontWeight: '600',
-    color: '#333',
-    marginTop: 4,
+    color: fontColor.secondary,
+    marginTop: spacing.xs,
   },
   autoCalcIndicator: {
-    fontSize: 14,
+    fontSize: fontSize.sm,
     fontWeight: '400',
-    color: '#007AFF',
+    color: colors.primary,
     fontStyle: 'italic',
   },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     borderRadius: 8,
-    padding: 16,
+    padding: spacing.lg,
     alignItems: 'center',
   },
   saveButtonText: {
-    color: '#fff',
-    fontSize: 18,
+    color: fontColor.inverse,
+    fontSize: fontSize.lg,
     fontWeight: '600',
   },
   displayNameEditContainer: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   displayNameInput: {
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: colors.primary,
     borderRadius: 8,
-    padding: 12,
-    fontSize: 22,
+    padding: spacing.md,
+    fontSize: fontSize['2xl'],
     fontWeight: '600',
     textAlign: 'center',
     width: '100%',
     maxWidth: 300,
-    backgroundColor: '#fff',
-    marginBottom: 12,
+    backgroundColor: colors.background.primary,
+    marginBottom: spacing.md,
   },
   displayNameActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
   },
   displayNameCancelButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border.medium,
   },
   displayNameCancelText: {
-    color: '#666',
-    fontSize: 16,
+    color: fontColor.tertiary,
+    fontSize: fontSize.base,
     fontWeight: '500',
   },
   displayNameSaveButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: 8,
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
   },
   displayNameSaveText: {
-    color: '#fff',
-    fontSize: 16,
+    color: fontColor.inverse,
+    fontSize: fontSize.base,
     fontWeight: '600',
   },
 });

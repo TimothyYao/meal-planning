@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DEFAULT_APP_OPTIONS } from 'expo-firebase-core';
 import { useAuth } from '../contexts/AuthContext';
 import { firebaseConfig } from '../config/firebase';
+import { spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
 import { CountryCodePicker } from '../components/CountryCodePicker';
 import { DEFAULT_COUNTRY, type CountryItem } from '../utils/countryCodes';
 import { FirebaseRecaptchaVerifierModal, FirebaseAuthApplicationVerifier } from 'expo-firebase-recaptcha';
@@ -275,7 +276,7 @@ export default function PhoneAuthScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.signedIn}>
-          <Ionicons name="checkmark-circle" size={64} color="#34C759" />
+          <Ionicons name="checkmark-circle" size={64} color={colors.status.success} />
           <Text style={styles.signedInTitle}>Signed in</Text>
           <Text style={styles.signedInDetail}>
             {user.phoneNumber || user.email || user.uid}
@@ -311,7 +312,7 @@ export default function PhoneAuthScreen() {
         </Text>
         {__DEV__ && (
           <View style={styles.testInfo}>
-            <Ionicons name="information-circle" size={16} color="#007AFF" />
+            <Ionicons name="information-circle" size={16} color={colors.primary} />
             <Text style={styles.testInfoText}>
               <Text style={{ fontWeight: '600' }}>Skip reCAPTCHA:</Text> Use test phone numbers from Firebase Console. See TEST_PHONE_NUMBERS.md for setup.
             </Text>
@@ -320,7 +321,7 @@ export default function PhoneAuthScreen() {
 
         {!hasValidConfig && (
           <View style={styles.configWarning}>
-            <Ionicons name="warning" size={20} color="#FF9500" />
+            <Ionicons name="warning" size={20} color={colors.status.warning} />
             <Text style={styles.configWarningText}>
               Add Firebase config to .env (see FIREBASE_API_KEY.md)
             </Text>
@@ -329,7 +330,7 @@ export default function PhoneAuthScreen() {
 
         {recaptchaError && (
           <View style={[styles.configWarning, { backgroundColor: '#FFEBEE' }]}>
-            <Ionicons name="alert-circle" size={20} color="#D32F2F" />
+            <Ionicons name="alert-circle" size={20} color={colors.status.error} />
             <Text style={[styles.configWarningText, { color: '#D32F2F' }]}>
               {recaptchaError}
             </Text>
@@ -347,7 +348,7 @@ export default function PhoneAuthScreen() {
               <TextInput
                 style={styles.phoneInput}
                 placeholder="234 567 8900"
-                placeholderTextColor="#8E8E93"
+                placeholderTextColor={fontColor.disabled}
                 value={phoneNumber}
                 onChangeText={setPhoneNumber}
                 keyboardType="phone-pad"
@@ -361,7 +362,7 @@ export default function PhoneAuthScreen() {
               disabled={loading || !hasValidConfig}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={fontColor.inverse} />
               ) : (
                 <Text style={styles.buttonText}>Send verification code</Text>
               )}
@@ -385,7 +386,7 @@ export default function PhoneAuthScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={fontColor.inverse} />
               ) : (
                 <Text style={styles.buttonText}>Verify code</Text>
               )}
@@ -407,114 +408,114 @@ export default function PhoneAuthScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.primary,
   },
   scrollContent: {
-    padding: 24,
+    padding: spacing['2xl'],
     paddingBottom: 48,
   },
   title: {
-    fontSize: 28,
+    fontSize: fontSize['3xl'],
     fontWeight: '700',
-    marginBottom: 8,
-    color: '#000',
+    marginBottom: spacing.sm,
+    color: fontColor.primary,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#8E8E93',
-    marginBottom: 24,
+    fontSize: fontSize.base,
+    color: fontColor.disabled,
+    marginBottom: spacing['2xl'],
   },
   configWarning: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
     backgroundColor: '#FFF9E6',
-    padding: 12,
+    padding: spacing.md,
     borderRadius: 8,
-    marginBottom: 24,
+    marginBottom: spacing['2xl'],
   },
   configWarningText: {
     flex: 1,
-    fontSize: 14,
-    color: '#666',
+    fontSize: fontSize.sm,
+    color: fontColor.tertiary,
   },
   form: {
-    gap: 16,
+    gap: spacing.lg,
   },
   phoneRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    gap: 12,
+    gap: spacing.md,
   },
   phoneInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#C6C6C8',
+    borderColor: colors.border.medium,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 17,
-    color: '#000',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    fontSize: fontSize.md,
+    color: fontColor.primary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#C6C6C8',
+    borderColor: colors.border.medium,
     borderRadius: 12,
-    padding: 16,
-    fontSize: 17,
-    color: '#000',
+    padding: spacing.lg,
+    fontSize: fontSize.md,
+    color: fontColor.primary,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     borderRadius: 12,
-    padding: 16,
+    padding: spacing.lg,
     alignItems: 'center',
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 17,
+    color: fontColor.inverse,
+    fontSize: fontSize.md,
     fontWeight: '600',
   },
   linkButton: {
-    padding: 12,
+    padding: spacing.md,
     alignItems: 'center',
   },
   linkButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
+    color: colors.primary,
+    fontSize: fontSize.base,
   },
   signedIn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing['2xl'],
   },
   signedInTitle: {
-    fontSize: 22,
+    fontSize: fontSize['2xl'],
     fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 4,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xs,
   },
   signedInDetail: {
-    fontSize: 16,
-    color: '#8E8E93',
+    fontSize: fontSize.base,
+    color: fontColor.disabled,
   },
   testInfo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: spacing.sm,
     backgroundColor: '#E3F2FD',
-    padding: 12,
+    padding: spacing.md,
     borderRadius: 8,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   testInfoText: {
     flex: 1,
     fontSize: 13,
-    color: '#1976D2',
+    color: colors.semantic.info,
     lineHeight: 18,
   },
 });

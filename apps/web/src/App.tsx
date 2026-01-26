@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { MacroTargets } from '@meal-planning/shared'
-import { formatMacroValue } from '@meal-planning/shared'
+import { formatMacroValue, spacing, fontSize, fontColor, colors } from '@meal-planning/shared'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import type { ConfirmationResult } from 'firebase/auth'
 import './App.css'
@@ -83,7 +83,7 @@ function AppContent() {
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     required
-                    style={{ padding: '8px', marginRight: '8px', width: '200px' }}
+                    style={{ padding: `${spacing.sm}px`, marginRight: `${spacing.sm}px`, width: '200px' }}
                   />
                   <button type="submit">Send Code</button>
                 </form>
@@ -95,7 +95,7 @@ function AppContent() {
                     value={verificationCode}
                     onChange={(e) => setVerificationCode(e.target.value)}
                     required
-                    style={{ padding: '8px', marginRight: '8px', width: '200px' }}
+                    style={{ padding: `${spacing.sm}px`, marginRight: `${spacing.sm}px`, width: '200px' }}
                   />
                   <button type="submit">Verify</button>
                   <button
