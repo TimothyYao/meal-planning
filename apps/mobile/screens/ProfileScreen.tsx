@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { UserProfile, MacroTargets, formatMacroValue, calculateCaloriesFromMacros } from '@meal-planning/shared';
-import { getTodayLog, setTodayTargetMacros } from '../utils/storage';
+import { getTodayLog, setTodayTargetMacros } from '../storage';
 import { NumberEditor } from '../components/NumberEditor';
 import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../contexts/AuthContext';

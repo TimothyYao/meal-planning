@@ -19,7 +19,7 @@ import {
   getLastFat,
   saveLastFat,
   generateFoodId,
-} from '../utils/storage';
+} from '../storage';
 import { ServingOption, ServingSizePicker } from './ServingSizePicker';
 import { MacroAmountPicker } from './MacroAmountPicker';
 import { NumberEditor } from './NumberEditor';

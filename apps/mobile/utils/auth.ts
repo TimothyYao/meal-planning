@@ -14,6 +14,8 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
 import { auth } from '../config/firebase';
+import type { AuthUser } from '@meal-planning/shared';
+import { convertFirebaseUser as convertFirebaseUserShared } from '@meal-planning/shared';
 
 // Complete the auth session for better UX
 WebBrowser.maybeCompleteAuthSession();
@@ -25,13 +27,8 @@ const googleDiscovery = {
   revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
 };
 
-export interface AuthUser {
-  uid: string;
-  email: string | null;
-  phoneNumber: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-}
+// Re-export AuthUser type for convenience
+export type { AuthUser };
 
 /**
  * Sign in with Google
@@ -275,15 +272,8 @@ export function onAuthStateChange(
 
 /**
  * Convert Firebase User to AuthUser
+ * Re-exported from shared package for convenience
  */
 export function convertFirebaseUser(user: User | null): AuthUser | null {
-  if (!user) return null;
-  
-  return {
-    uid: user.uid,
-    email: user.email,
-    phoneNumber: user.phoneNumber,
-    displayName: user.displayName,
-    photoURL: user.photoURL,
-  };
+  return convertFirebaseUserShared(user);
 }

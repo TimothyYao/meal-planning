@@ -4,7 +4,7 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navig
 import { useCallback, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { FoodItem, formatMacroValue } from '@meal-planning/shared';
-import { saveFood, addFoodToDate, generateFoodId, getFoodById, getTodayDate } from '../utils/storage';
+import { saveFood, addFoodToDate, generateFoodId, getFoodById, getTodayDate } from '../storage';
 import { safeGoBack } from '../utils/navigation';
 
 type FoodDetailRouteParams = {

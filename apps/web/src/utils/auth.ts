@@ -10,14 +10,11 @@ import {
   RecaptchaVerifier,
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import type { AuthUser } from '@meal-planning/shared';
+import { convertFirebaseUser as convertFirebaseUserShared } from '@meal-planning/shared';
 
-export interface AuthUser {
-  uid: string;
-  email: string | null;
-  phoneNumber: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-}
+// Re-export AuthUser type for convenience
+export type { AuthUser };
 
 const googleProvider = new GoogleAuthProvider();
 const appleProvider = new OAuthProvider('apple.com');
@@ -152,15 +149,8 @@ export function onAuthStateChange(
 
 /**
  * Convert Firebase User to AuthUser
+ * Re-exported from shared package for convenience
  */
 export function convertFirebaseUser(user: User | null): AuthUser | null {
-  if (!user) return null;
-  
-  return {
-    uid: user.uid,
-    email: user.email,
-    phoneNumber: user.phoneNumber,
-    displayName: user.displayName,
-    photoURL: user.photoURL,
-  };
+  return convertFirebaseUserShared(user);
 }

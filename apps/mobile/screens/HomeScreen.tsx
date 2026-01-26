@@ -6,7 +6,7 @@ import { useCallback } from 'react';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { DailyLog, formatMacroValue, MealFood } from '@meal-planning/shared';
-import { getLogForDate, removeFoodFromDate } from '../utils/storage';
+import { getLogForDate, removeFoodFromDate } from '../storage';
 import FoodItem from '../components/FoodItem';
 import CalendarPicker from '../components/CalendarPicker';
 

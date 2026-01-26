@@ -51,6 +51,14 @@ export interface UserProfile {
   targetMacros: MacroTargets;
 }
 
+export interface AuthUser {
+  uid: string;
+  email: string | null;
+  phoneNumber: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}
+
 // Utility functions
 export function calculateMacros(foods: MealFood[]): MacroTargets {
   return foods.reduce(
@@ -82,5 +90,74 @@ export function formatMacroValue(value: number, unit: 'calories' | 'grams'): str
  */
 export function calculateCaloriesFromMacros(protein: number, carbs: number, fat: number): number {
   return protein * 4 + carbs * 4 + fat * 9;
+}
+
+/**
+ * Convert Firebase User to AuthUser
+ * This is a type-safe conversion that works with Firebase User objects
+ */
+export function convertFirebaseUser(user: { uid: string; email: string | null; phoneNumber: string | null; displayName: string | null; photoURL: string | null } | null): AuthUser | null {
+  if (!user) return null;
+  
+  return {
+    uid: user.uid,
+    email: user.email,
+    phoneNumber: user.phoneNumber,
+    displayName: user.displayName,
+    photoURL: user.photoURL,
+  };
+}
+
+/**
+ * Serialize a DailyLog for storage (converts Date objects to ISO strings)
+ */
+export function serializeDailyLog(log: DailyLog): Record<string, any> {
+  return {
+    ...log,
+    meals: log.meals.map((meal) => ({
+      ...meal,
+      timestamp: meal.timestamp instanceof Date 
+        ? meal.timestamp.toISOString() 
+        : (typeof meal.timestamp === 'string' ? meal.timestamp : new Date().toISOString()),
+      foods: meal.foods.map((mealFood) => ({
+        ...mealFood,
+        addedAt: mealFood.addedAt instanceof Date 
+          ? mealFood.addedAt.toISOString() 
+          : (typeof mealFood.addedAt === 'string' ? mealFood.addedAt : (mealFood.addedAt ? new Date().toISOString() : undefined)),
+      })),
+    })),
+  };
+}
+
+/**
+ * Deserialize a DailyLog from storage (converts ISO strings to Date objects)
+ */
+export function deserializeDailyLog(log: any): DailyLog {
+  return {
+    ...log,
+    meals: log.meals.map((meal: any) => ({
+      ...meal,
+      timestamp: typeof meal.timestamp === 'string' 
+        ? new Date(meal.timestamp) 
+        : (meal.timestamp instanceof Date ? meal.timestamp : new Date()),
+      foods: meal.foods.map((mealFood: any) => ({
+        ...mealFood,
+        addedAt: typeof mealFood.addedAt === 'string' 
+          ? new Date(mealFood.addedAt) 
+          : (mealFood.addedAt instanceof Date ? mealFood.addedAt : undefined),
+      })),
+    })),
+  };
+}
+
+/**
+ * Storage abstraction interface for platform-agnostic storage operations
+ * This allows mobile (AsyncStorage) and web (localStorage) to share the same API
+ */
+export interface StorageAdapter {
+  getItem(key: string): Promise<string | null>;
+  setItem(key: string, value: string): Promise<void>;
+  removeItem(key: string): Promise<void>;
+  clear(): Promise<void>;
 }
 

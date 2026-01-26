@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useRef, useState } from 'react';
 import { FoodItem } from '@meal-planning/shared';
-import { saveFood, getFoodById, updateFoodQuantityInDate, moveFoodToDate, getTodayDate } from '../utils/storage';
+import { saveFood, getFoodById, updateFoodQuantityInDate, moveFoodToDate, getTodayDate } from '../storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
 import { safeGoBack } from '../utils/navigation';
 
