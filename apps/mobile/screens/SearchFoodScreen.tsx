@@ -9,11 +9,13 @@ import { getFoods, addFoodToDate, saveFood, deleteFood } from '../storage';
 import { safeGoBack } from '../utils/navigation';
 import { searchUSDAFoods, convertUSDAToFoodItem, isUSDAAvailable } from '../utils/usdaApi';
 import { getCachedSearch, cacheSearch } from '../utils/usdaCache';
+import { searchAndConvertOFFProducts } from '../utils/offApi';
+import { getCachedOFFSearch, cacheOFFSearch } from '../utils/offCache';
 
 interface SearchSection {
   title: string;
   data: FoodItem[];
-  type: 'history' | 'usda';
+  type: 'history' | 'usda' | 'off';
 }
 
 export default function SearchFoodScreen() {
@@ -23,9 +25,12 @@ export default function SearchFoodScreen() {
   const [historyFoods, setHistoryFoods] = useState<FoodItem[]>([]);
   const [filteredHistoryFoods, setFilteredHistoryFoods] = useState<FoodItem[]>([]);
   const [usdaFoods, setUsdaFoods] = useState<FoodItem[]>([]);
+  const [offFoods, setOffFoods] = useState<FoodItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [loadingUSDA, setLoadingUSDA] = useState(false);
+  const [loadingOFF, setLoadingOFF] = useState(false);
   const [usdaError, setUsdaError] = useState<string | null>(null);
+  const [offError, setOffError] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
@@ -99,6 +104,48 @@ export default function SearchFoodScreen() {
     }
   }, [searchQuery]);
 
+  const searchOFF = useCallback(async () => {
+    if (searchQuery.trim().length < 2) {
+      setOffFoods([]);
+      setLoadingOFF(false);
+      return;
+    }
+
+    try {
+      setLoadingOFF(true);
+      setOffError(null);
+      console.log('Searching Open Food Facts for:', searchQuery);
+      
+      // Check cache first
+      const cachedResults = await getCachedOFFSearch(searchQuery);
+      
+      if (cachedResults && cachedResults.length > 0) {
+        console.log('Using cached Open Food Facts results:', cachedResults.length, 'foods');
+        setOffFoods(cachedResults);
+        setLoadingOFF(false);
+        return;
+      }
+      
+      // If not in cache, fetch from API
+      const foods = await searchAndConvertOFFProducts(searchQuery, 1, 20);
+      console.log('Open Food Facts search returned', foods.length, 'foods');
+      
+      // Cache the results
+      if (foods.length > 0) {
+        await cacheOFFSearch(searchQuery, foods, foods.length);
+      }
+      
+      setOffFoods(foods);
+    } catch (error: any) {
+      console.error('Error searching Open Food Facts:', error);
+      const errorMessage = error.message || 'Failed to search Open Food Facts database';
+      setOffError(errorMessage);
+      setOffFoods([]);
+    } finally {
+      setLoadingOFF(false);
+    }
+  }, [searchQuery]);
+
   // Debounced USDA search
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -108,7 +155,9 @@ export default function SearchFoodScreen() {
     if (searchQuery.trim() === '') {
       setFilteredHistoryFoods(historyFoods);
       setUsdaFoods([]);
+      setOffFoods([]);
       setUsdaError(null);
+      setOffError(null);
       return;
     }
 
@@ -121,26 +170,33 @@ export default function SearchFoodScreen() {
     );
     setFilteredHistoryFoods(filtered);
 
-    // Debounce USDA search (wait 500ms after user stops typing)
-    // Only search if USDA API is available
+    // Debounce searches (wait 500ms after user stops typing)
+    // Search both USDA and Open Food Facts
     if (isUSDAAvailable()) {
       setLoadingUSDA(true);
       setUsdaError(null);
-      searchTimeoutRef.current = setTimeout(() => {
-        searchUSDA();
-      }, 500);
-    } else {
-      setUsdaFoods([]);
-      setUsdaError(null);
-      setLoadingUSDA(false);
     }
+    setLoadingOFF(true);
+    setOffError(null);
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      if (isUSDAAvailable()) {
+        searchUSDA();
+      } else {
+        setUsdaFoods([]);
+        setUsdaError(null);
+        setLoadingUSDA(false);
+      }
+      // Open Food Facts is always available (no API key needed)
+      searchOFF();
+    }, 500);
 
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchQuery, historyFoods, searchUSDA]);
+  }, [searchQuery, historyFoods, searchUSDA, searchOFF]);
 
   const loadHistoryFoods = async () => {
     try {
@@ -250,6 +306,14 @@ export default function SearchFoodScreen() {
       });
     }
     
+    if (offFoods.length > 0) {
+      sections.push({
+        title: 'Open Food Facts',
+        data: offFoods,
+        type: 'off',
+      });
+    }
+    
     return sections;
   };
 
@@ -296,7 +360,7 @@ export default function SearchFoodScreen() {
               currentOpenSwipeable.current.close();
               return;
             }
-            handleFoodSelect(item, section.type === 'usda');
+            handleFoodSelect(item, section.type === 'usda' || section.type === 'off');
           }}
           activeOpacity={0.7}
         >
@@ -309,19 +373,22 @@ export default function SearchFoodScreen() {
             {section.type === 'usda' && (
               <Text style={styles.usdaLabel}>USDA • 100g serving</Text>
             )}
+            {section.type === 'off' && (
+              <Text style={styles.offLabel}>Open Food Facts • 100g serving</Text>
+            )}
           </View>
         </TouchableOpacity>
         <View style={styles.foodActions}>
           <TouchableOpacity
             style={[styles.actionButton, { marginRight: spacing.sm }]}
-            onPress={() => handleEditFood(item, section.type === 'usda')}
+            onPress={() => handleEditFood(item, section.type === 'usda' || section.type === 'off')}
             activeOpacity={0.7}
           >
             <Ionicons name="create-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => handleFoodSelect(item, section.type === 'usda')}
+            onPress={() => handleFoodSelect(item, section.type === 'usda' || section.type === 'off')}
             activeOpacity={0.7}
           >
             <Ionicons name="add-circle" size={22} color={colors.primary} />
@@ -364,6 +431,9 @@ export default function SearchFoodScreen() {
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{section.title}</Text>
       {section.type === 'usda' && loadingUSDA && (
+        <ActivityIndicator size="small" color={colors.primary} style={styles.sectionLoader} />
+      )}
+      {section.type === 'off' && loadingOFF && (
         <ActivityIndicator size="small" color={colors.primary} style={styles.sectionLoader} />
       )}
     </View>
@@ -418,9 +488,9 @@ export default function SearchFoodScreen() {
               </Text>
               <Text style={styles.emptySubtext}>
                 {searchQuery.trim() === ''
-                  ? 'Start by creating a custom food or search the USDA database'
-                  : usdaError
-                  ? usdaError
+                  ? 'Start by creating a custom food or search the databases'
+                  : (usdaError || offError)
+                  ? (usdaError || offError)
                   : `Try searching for "${searchQuery}"`}
               </Text>
             </View>
@@ -434,10 +504,16 @@ export default function SearchFoodScreen() {
               showsVerticalScrollIndicator={false}
               stickySectionHeadersEnabled={false}
               ListFooterComponent={
-                loadingUSDA ? (
+                (loadingUSDA || loadingOFF) ? (
                   <View style={styles.usdaLoadingContainer}>
                     <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={styles.usdaLoadingText}>Searching USDA database...</Text>
+                    <Text style={styles.usdaLoadingText}>
+                      {loadingUSDA && loadingOFF 
+                        ? 'Searching databases...' 
+                        : loadingUSDA 
+                        ? 'Searching USDA database...' 
+                        : 'Searching Open Food Facts...'}
+                    </Text>
                   </View>
                 ) : null
               }
@@ -565,6 +641,12 @@ const styles = StyleSheet.create({
   usdaLabel: {
     fontSize: fontSize.xs,
     color: colors.primary,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  offLabel: {
+    fontSize: fontSize.xs,
+    color: '#4CAF50',
     marginTop: 2,
     fontWeight: '500',
   },
