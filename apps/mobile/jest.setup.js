@@ -1,19 +1,21 @@
-const store = new Map();
+const mockStore = new Map();
 
-const asyncStorageMock = {
+const mockAsyncStorage = {
   setItem: jest.fn((key, value) => {
-    store.set(key, value);
+    mockStore.set(key, value);
     return Promise.resolve();
   }),
-  getItem: jest.fn((key) => Promise.resolve(store.has(key) ? store.get(key) : null)),
+  getItem: jest.fn((key) =>
+    Promise.resolve(mockStore.has(key) ? mockStore.get(key) : null)
+  ),
   removeItem: jest.fn((key) => {
-    store.delete(key);
+    mockStore.delete(key);
     return Promise.resolve();
   }),
   clear: jest.fn(() => {
-    store.clear();
+    mockStore.clear();
     return Promise.resolve();
   }),
 };
 
-jest.mock('@react-native-async-storage/async-storage', () => asyncStorageMock);
+jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
