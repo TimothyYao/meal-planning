@@ -1,3 +1,6 @@
+// Unmock the global firestore mock so we can test the actual implementation with mocked firebase
+jest.unmock('../utils/firestore');
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DailyLog, FoodItem } from '@meal-planning/shared';
 import { saveFoodToFirestore, getDailyLogFromFirestore, syncLocalCacheToFirestore } from '../utils/firestore';
