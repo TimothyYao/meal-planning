@@ -33,6 +33,7 @@ export {
 // Macro operations
 export {
   setTodayTargetMacros,
+  getUserTargetMacros,
   syncToFirestore,
   saveLastProtein,
   getLastProtein,

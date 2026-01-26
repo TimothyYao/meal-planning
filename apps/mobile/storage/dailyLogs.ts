@@ -7,6 +7,7 @@ import {
 } from '../utils/firestore';
 import { DAILY_LOGS_KEY, RECENT_FOODS_CACHE_KEY } from './constants';
 import { generateFoodId, getTodayDate } from './utils';
+import { getUserTargetMacros } from './macros';
 
 /**
  * Add a food to a specific date's log
@@ -19,11 +20,13 @@ export async function addFoodToDate(food: FoodItem, quantity: number = 1, date: 
     // Get or create the date's log
     let dateLog = logs[date];
     if (!dateLog) {
+      // Use user profile targets instead of hardcoded defaults
+      const targetMacros = await getUserTargetMacros();
       dateLog = {
         date: date,
         meals: [],
         totalMacros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-        targetMacros: { calories: 2000, protein: 150, carbs: 200, fat: 65 }, // Default targets
+        targetMacros: targetMacros,
       };
     }
     
@@ -109,6 +112,7 @@ export async function addFoodToToday(food: FoodItem, quantity: number = 1): Prom
 
 /**
  * Get today's log
+ * If no log exists, returns a log with user profile targets (or defaults)
  */
 export async function getTodayLog(): Promise<DailyLog | null> {
   try {
@@ -119,7 +123,13 @@ export async function getTodayLog(): Promise<DailyLog | null> {
     if (user) {
       try {
         const firestoreLog = await getDailyLogFromFirestore(today);
-        if (firestoreLog) return firestoreLog;
+        if (firestoreLog) {
+          // Ensure targetMacros are synced with user profile if missing
+          if (!firestoreLog.targetMacros) {
+            firestoreLog.targetMacros = await getUserTargetMacros();
+          }
+          return firestoreLog;
+        }
       } catch (error) {
         console.error('Error getting daily log from Firestore, falling back to local:', error);
       }
@@ -129,10 +139,24 @@ export async function getTodayLog(): Promise<DailyLog | null> {
     const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
     const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
     const log = logs[today];
-    if (!log) return null;
+    if (log) {
+      // Convert timestamp strings back to Date objects
+      const dailyLog = deserializeDailyLog(log);
+      // Ensure targetMacros are synced with user profile if missing
+      if (!dailyLog.targetMacros) {
+        dailyLog.targetMacros = await getUserTargetMacros();
+      }
+      return dailyLog;
+    }
     
-    // Convert timestamp strings back to Date objects
-    return deserializeDailyLog(log);
+    // If no log exists, return a log with user profile targets (for consistency with getLogForDate)
+    const targetMacros = await getUserTargetMacros();
+    return {
+      date: today,
+      meals: [],
+      totalMacros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+      targetMacros: targetMacros,
+    };
   } catch (error) {
     console.error('Error getting today log:', error);
     return null;
@@ -141,6 +165,7 @@ export async function getTodayLog(): Promise<DailyLog | null> {
 
 /**
  * Get log for a specific date
+ * If no log exists, returns a log with user profile targets (or defaults)
  */
 export async function getLogForDate(date: string): Promise<DailyLog | null> {
   try {
@@ -155,6 +180,10 @@ export async function getLogForDate(date: string): Promise<DailyLog | null> {
       console.log(`[getLogForDate] Found local log for ${date}, meals count:`, log.meals?.length || 0);
       // Convert timestamp strings back to Date objects
       const dailyLog = deserializeDailyLog(log);
+      // Ensure targetMacros are synced with user profile if missing
+      if (!dailyLog.targetMacros) {
+        dailyLog.targetMacros = await getUserTargetMacros();
+      }
       console.log(`[getLogForDate] Returning daily log with ${dailyLog.meals.length} meals, total foods:`, 
         dailyLog.meals.reduce((sum, m) => sum + m.foods.length, 0));
       return dailyLog;
@@ -167,13 +196,27 @@ export async function getLogForDate(date: string): Promise<DailyLog | null> {
     if (user) {
       try {
         const firestoreLog = await getDailyLogFromFirestore(date);
-        if (firestoreLog) return firestoreLog;
+        if (firestoreLog) {
+          // Ensure targetMacros are synced with user profile if missing
+          if (!firestoreLog.targetMacros) {
+            firestoreLog.targetMacros = await getUserTargetMacros();
+          }
+          return firestoreLog;
+        }
       } catch (error) {
         console.error('Error getting daily log from Firestore:', error);
       }
     }
     
-    return null;
+    // If no log exists, return a log with user profile targets (for dashboard display)
+    // This allows the dashboard to show targets even when no foods have been logged
+    const targetMacros = await getUserTargetMacros();
+    return {
+      date: date,
+      meals: [],
+      totalMacros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+      targetMacros: targetMacros,
+    };
   } catch (error) {
     console.error('Error getting log for date:', error);
     return null;
@@ -304,11 +347,13 @@ export async function moveFoodToDate(fromDate: string, toDate: string, mealId: s
       // Add to new date
       let toDateLog = logs[toDate];
       if (!toDateLog) {
+        // Use user profile targets instead of hardcoded defaults
+        const targetMacros = await getUserTargetMacros();
         toDateLog = {
           date: toDate,
           meals: [],
           totalMacros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-          targetMacros: { calories: 2000, protein: 150, carbs: 200, fat: 65 },
+          targetMacros: targetMacros,
         };
       }
       

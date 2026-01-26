@@ -6,7 +6,7 @@ import { useCallback } from 'react';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { DailyLog, formatMacroValue, MealFood, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
-import { getLogForDate, removeFoodFromDate } from '../storage';
+import { getLogForDate, removeFoodFromDate, getUserTargetMacros } from '../storage';
 import FoodItem from '../components/FoodItem';
 import CalendarPicker from '../components/CalendarPicker';
 import { setRefreshHomeScreen } from '../App';
@@ -18,6 +18,7 @@ export default function HomeScreen() {
   const [selectedDateLog, setSelectedDateLog] = useState<DailyLog | null>(null);
   const [loading, setLoading] = useState(true);
   const [calendarVisible, setCalendarVisible] = useState(false);
+  const [userTargetMacros, setUserTargetMacros] = useState<{ calories: number; protein: number; carbs: number; fat: number } | null>(null);
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
   const currentOpenSwipeable = useRef<Swipeable | null>(null);
   
@@ -37,6 +38,10 @@ export default function HomeScreen() {
 
   const loadDateLog = useCallback(async () => {
     try {
+      // Load user profile targets first (for fallback)
+      const targets = await getUserTargetMacros();
+      setUserTargetMacros(targets);
+      
       const dateString = formatDateString(selectedDate);
       const log = await getLogForDate(dateString);
       setSelectedDateLog(log);
@@ -148,7 +153,8 @@ export default function HomeScreen() {
     );
   };
 
-  const targetMacros = selectedDateLog?.targetMacros || {
+  // Get target macros from log, or use user profile targets as fallback
+  const targetMacros = selectedDateLog?.targetMacros || userTargetMacros || {
     calories: 2000,
     protein: 150,
     carbs: 200,
@@ -178,7 +184,7 @@ export default function HomeScreen() {
       return;
     }
     
-    const targetMacros = selectedDateLog.targetMacros || {
+    const targetMacros = selectedDateLog.targetMacros || userTargetMacros || {
       calories: 2000,
       protein: 150,
       carbs: 200,
