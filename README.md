@@ -90,8 +90,8 @@ cd packages/shared && npm run build
    - Enable Phone Sign In (requires Blaze plan for SMS)
 
 3. **Get Firebase Configuration**:
-   - See [FIREBASE_SETUP.md](./FIREBASE_SETUP.md) for detailed instructions
-   - See [FIREBASE_API_KEY.md](./FIREBASE_API_KEY.md) for finding API keys
+   - Navigate to Project Settings > General in Firebase Console
+   - Copy the Firebase SDK configuration object for your apps
 
 ### 3. Environment Variables
 
@@ -138,8 +138,6 @@ service cloud.firestore {
   }
 }
 ```
-
-See [FIRESTORE_SECURITY_RULES.md](./FIRESTORE_SECURITY_RULES.md) for more details.
 
 ## Development
 
@@ -274,11 +272,6 @@ const todayLog = await getTodayLog();
 
 ## Documentation
 
-- **[FIREBASE_SETUP.md](./FIREBASE_SETUP.md)**: Complete Firebase setup guide
-- **[FIREBASE_API_KEY.md](./FIREBASE_API_KEY.md)**: How to find Firebase API keys
-- **[PHONE_AUTH_SETUP.md](./PHONE_AUTH_SETUP.md)**: Phone authentication setup
-- **[FIREBASE_FEATURES.md](./FIREBASE_FEATURES.md)**: Firebase integration details
-- **[FIRESTORE_SECURITY_RULES.md](./FIRESTORE_SECURITY_RULES.md)**: Security rules configuration
 - **[doc/architecture.md](./doc/architecture.md)**: Technical architecture
 - **[doc/data-models.md](./doc/data-models.md)**: Data models and entities
 - **[doc/vision.md](./doc/vision.md)**: Product vision and roadmap
@@ -295,17 +288,14 @@ const todayLog = await getTodayLog();
 **Firebase authentication errors**:
 - Verify environment variables are set correctly
 - Check Firebase Console for enabled authentication providers
-- See [FIREBASE_SETUP.md](./FIREBASE_SETUP.md) for detailed troubleshooting
 
 **Phone authentication not working**:
 - Phone auth requires Firebase Blaze plan (pay-as-you-go)
-- See [PHONE_AUTH_SETUP.md](./PHONE_AUTH_SETUP.md) for setup instructions
-- See [TEST_PHONE_NUMBERS.md](./TEST_PHONE_NUMBERS.md) for test numbers
+- Ensure phone authentication is enabled in Firebase Console
 
 **Firestore sync issues**:
 - Check Firestore security rules
 - Verify user is authenticated
-- See [FIRESTORE_TROUBLESHOOTING.md](./FIRESTORE_TROUBLESHOOTING.md) for common issues
 
 ## Tech Stack
 
