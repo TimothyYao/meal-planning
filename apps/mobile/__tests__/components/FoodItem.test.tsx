@@ -4,6 +4,7 @@ import FoodItem from '../../components/FoodItem';
 import type { MealFood, FoodItem as FoodItemType } from '@meal-planning/shared';
 
 describe('FoodItem', () => {
+  // Sample data - realistic food and meal data
   const sampleFood: FoodItemType = {
     id: 'food-123',
     name: 'Chicken Breast',
@@ -27,128 +28,132 @@ describe('FoodItem', () => {
     onPress: jest.fn(),
     onRemove: jest.fn(),
     formatServingInfo: jest.fn((qty, size, unit) => `${qty} x ${size}${unit}`),
-    formatTime: jest.fn((date) => '2:30 PM'),
-    calculateCaloriesFromMacros: jest.fn((macros) => macros.protein * 4 + macros.carbs * 4 + macros.fat * 9),
+    formatTime: jest.fn(() => '2:30 PM'),
+    calculateCaloriesFromMacros: jest.fn(
+      (macros) => macros.protein * 4 + macros.carbs * 4 + macros.fat * 9
+    ),
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('renders food name', () => {
-    const { getByText } = render(<FoodItem {...defaultProps} />);
-    
-    expect(getByText('Chicken Breast')).toBeTruthy();
+  describe('rendering', () => {
+    it('renders food name', () => {
+      const { getByText } = render(<FoodItem {...defaultProps} />);
+
+      expect(getByText('Chicken Breast')).toBeTruthy();
+    });
+
+    it('displays serving info using formatServingInfo', () => {
+      const formatServingInfo = jest.fn(() => '1 serving (100g)');
+      const { getByText } = render(
+        <FoodItem {...defaultProps} formatServingInfo={formatServingInfo} />
+      );
+
+      expect(getByText('1 serving (100g)')).toBeTruthy();
+      expect(formatServingInfo).toHaveBeenCalledWith(1, 100, 'g');
+    });
+
+    it('displays time when addedAt is provided', () => {
+      const formatTime = jest.fn(() => '2:30 PM');
+      const { getByText } = render(
+        <FoodItem {...defaultProps} formatTime={formatTime} />
+      );
+
+      expect(getByText('2:30 PM')).toBeTruthy();
+    });
+
+    it('displays macro values in P/C/F format', () => {
+      const { getByText } = render(<FoodItem {...defaultProps} />);
+
+      expect(getByText(/31/)).toBeTruthy(); // protein
+      expect(getByText(/P\//)).toBeTruthy();
+    });
+
+    it('displays calculated calories', () => {
+      const { getByText } = render(<FoodItem {...defaultProps} />);
+
+      // Calories = 31*4 + 0*4 + 3.6*9 = 156.4 ≈ 156
+      expect(getByText(/156/)).toBeTruthy();
+    });
   });
 
-  it('displays serving info using formatServingInfo', () => {
-    const formatServingInfo = jest.fn(() => '1 serving (100g)');
-    const { getByText } = render(
-      <FoodItem {...defaultProps} formatServingInfo={formatServingInfo} />
-    );
-    
-    expect(getByText('1 serving (100g)')).toBeTruthy();
-    expect(formatServingInfo).toHaveBeenCalledWith(1, 100, 'g');
+  describe('user interactions', () => {
+    it('calls onPress when item is pressed', () => {
+      const onPress = jest.fn();
+      const { getByText } = render(
+        <FoodItem {...defaultProps} onPress={onPress} />
+      );
+
+      fireEvent.press(getByText('Chicken Breast'));
+
+      expect(onPress).toHaveBeenCalled();
+    });
   });
 
-  it('displays time when addedAt is provided', () => {
-    const formatTime = jest.fn(() => '2:30 PM');
-    const { getByText } = render(
-      <FoodItem {...defaultProps} formatTime={formatTime} />
-    );
-    
-    expect(getByText('2:30 PM')).toBeTruthy();
+  describe('quantity calculations', () => {
+    it('calculates macros with quantity multiplier', () => {
+      const mealFoodWithQuantity: MealFood = {
+        ...sampleMealFood,
+        quantity: 2,
+      };
+
+      const { getByText } = render(
+        <FoodItem {...defaultProps} mealFood={mealFoodWithQuantity} />
+      );
+
+      // Protein * 2 = 62
+      expect(getByText(/62/)).toBeTruthy();
+    });
   });
 
-  it('displays macro values', () => {
-    const { getByText } = render(<FoodItem {...defaultProps} />);
-    
-    // P/C/F format
-    expect(getByText(/31/)).toBeTruthy(); // protein
-    expect(getByText(/P\//)).toBeTruthy();
+  describe('edge cases', () => {
+    it('handles food without addedAt timestamp', () => {
+      const mealFoodNoTime: MealFood = {
+        foodId: 'food-123',
+        food: sampleFood,
+        quantity: 1,
+      };
+
+      const { queryByText } = render(
+        <FoodItem {...defaultProps} mealFood={mealFoodNoTime} />
+      );
+
+      // Should not show time
+      expect(queryByText('2:30 PM')).toBeNull();
+    });
   });
 
-  it('displays calculated calories', () => {
-    const { getByText } = render(<FoodItem {...defaultProps} />);
-    
-    // Calories = 31*4 + 0*4 + 3.6*9 = 156.4 ≈ 156
-    expect(getByText(/156/)).toBeTruthy();
-  });
+  describe('callback functions', () => {
+    it('calls formatServingInfo with correct arguments', () => {
+      const formatServingInfo = jest.fn(() => 'serving info');
+      render(<FoodItem {...defaultProps} formatServingInfo={formatServingInfo} />);
 
-  it('calls onPress when item is pressed', () => {
-    const onPress = jest.fn();
-    const { getByText } = render(
-      <FoodItem {...defaultProps} onPress={onPress} />
-    );
-    
-    fireEvent.press(getByText('Chicken Breast'));
-    
-    expect(onPress).toHaveBeenCalled();
-  });
+      expect(formatServingInfo).toHaveBeenCalledWith(
+        sampleMealFood.quantity,
+        sampleFood.servingSize,
+        sampleFood.servingUnit
+      );
+    });
 
-  it('calculates macros with quantity multiplier', () => {
-    const mealFoodWithQuantity: MealFood = {
-      ...sampleMealFood,
-      quantity: 2,
-    };
-    
-    const { getByText } = render(
-      <FoodItem {...defaultProps} mealFood={mealFoodWithQuantity} />
-    );
-    
-    // Protein * 2 = 62
-    expect(getByText(/62/)).toBeTruthy();
-  });
+    it('calls calculateCaloriesFromMacros with food macros', () => {
+      const calculateCaloriesFromMacros = jest.fn(() => 200);
+      render(
+        <FoodItem
+          {...defaultProps}
+          calculateCaloriesFromMacros={calculateCaloriesFromMacros}
+        />
+      );
 
-  it('handles food without addedAt timestamp', () => {
-    const mealFoodNoTime: MealFood = {
-      foodId: 'food-123',
-      food: sampleFood,
-      quantity: 1,
-    };
-    
-    const { queryByText } = render(
-      <FoodItem {...defaultProps} mealFood={mealFoodNoTime} />
-    );
-    
-    // Should not show time
-    expect(queryByText('2:30 PM')).toBeNull();
-  });
+      expect(calculateCaloriesFromMacros).toHaveBeenCalledWith(sampleFood.macros);
+    });
 
-  it('calls formatServingInfo with correct arguments', () => {
-    const formatServingInfo = jest.fn(() => 'serving info');
-    render(<FoodItem {...defaultProps} formatServingInfo={formatServingInfo} />);
-    
-    expect(formatServingInfo).toHaveBeenCalledWith(
-      sampleMealFood.quantity,
-      sampleFood.servingSize,
-      sampleFood.servingUnit
-    );
-  });
+    it('calls onSwipeableRef when mounted', () => {
+      const onSwipeableRef = jest.fn();
+      render(<FoodItem {...defaultProps} onSwipeableRef={onSwipeableRef} />);
 
-  it('calls calculateCaloriesFromMacros with food macros', () => {
-    const calculateCaloriesFromMacros = jest.fn(() => 200);
-    render(
-      <FoodItem {...defaultProps} calculateCaloriesFromMacros={calculateCaloriesFromMacros} />
-    );
-    
-    expect(calculateCaloriesFromMacros).toHaveBeenCalledWith(sampleFood.macros);
-  });
-
-  it('renders delete button in swipe action', () => {
-    // The delete button is shown when swiped
-    // Testing the existence of the component structure
-    const { UNSAFE_root } = render(<FoodItem {...defaultProps} />);
-    
-    // The Swipeable component should be rendered
-    expect(UNSAFE_root).toBeTruthy();
-  });
-
-  it('calls onSwipeableRef when mounted', () => {
-    const onSwipeableRef = jest.fn();
-    render(<FoodItem {...defaultProps} onSwipeableRef={onSwipeableRef} />);
-    
-    // onSwipeableRef is called with the ref
-    expect(onSwipeableRef).toHaveBeenCalled();
+      expect(onSwipeableRef).toHaveBeenCalled();
+    });
   });
 });

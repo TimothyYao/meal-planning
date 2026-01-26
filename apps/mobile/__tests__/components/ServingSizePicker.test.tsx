@@ -1,8 +1,12 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { ServingSizePicker, ServingOption } from '../../components/ServingSizePicker';
+import {
+  ServingSizePicker,
+  ServingOption,
+} from '../../components/ServingSizePicker';
 
 describe('ServingSizePicker', () => {
+  // Sample data - realistic serving options
   const mockOptions: ServingOption[] = [
     { id: '1g', value: 1, unit: 'g', label: '1 g' },
     { id: '100g', value: 100, unit: 'g', label: '100 g' },
@@ -21,113 +25,109 @@ describe('ServingSizePicker', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the selected option label', () => {
-    const { getByText } = render(<ServingSizePicker {...defaultProps} />);
-    
-    expect(getByText('100 g')).toBeTruthy();
-  });
+  describe('rendering', () => {
+    it('renders the selected option label', () => {
+      const { getByText } = render(<ServingSizePicker {...defaultProps} />);
 
-  it('shows different selected option when selectedId changes', () => {
-    const { getByText } = render(
-      <ServingSizePicker {...defaultProps} selectedId="1cup" />
-    );
-    
-    expect(getByText('1 cup (240 ml)')).toBeTruthy();
-  });
-
-  it('opens modal when pressed', async () => {
-    const onExpandedChange = jest.fn();
-    const { getByText } = render(
-      <ServingSizePicker {...defaultProps} onExpandedChange={onExpandedChange} />
-    );
-    
-    // Press the trigger button
-    fireEvent.press(getByText('100 g'));
-    
-    // Wait for modal to open
-    await waitFor(() => {
-      expect(onExpandedChange).toHaveBeenCalledWith(true);
+      expect(getByText('100 g')).toBeTruthy();
     });
-  });
 
-  it('displays all options in modal', async () => {
-    const { getByText, findByText } = render(<ServingSizePicker {...defaultProps} />);
-    
-    // Open modal
-    fireEvent.press(getByText('100 g'));
-    
-    // Check all options are visible
-    await waitFor(() => {
-      expect(getByText('1 g')).toBeTruthy();
-      expect(getByText('1 serving')).toBeTruthy();
+    it('shows different selected option when selectedId changes', () => {
+      const { getByText } = render(
+        <ServingSizePicker {...defaultProps} selectedId="1cup" />
+      );
+
       expect(getByText('1 cup (240 ml)')).toBeTruthy();
     });
-  });
 
-  it('calls onSelect when an option is chosen', async () => {
-    const onSelect = jest.fn();
-    const { getByText, getAllByText } = render(
-      <ServingSizePicker {...defaultProps} onSelect={onSelect} />
-    );
-    
-    // Open modal
-    fireEvent.press(getByText('100 g'));
-    
-    // Wait for modal to appear and select an option
-    await waitFor(() => {
-      const servingOption = getAllByText('1 serving')[0];
-      fireEvent.press(servingOption);
-    });
-    
-    expect(onSelect).toHaveBeenCalledWith('1serving');
-  });
+    it('displays "Select" when no option matches selectedId', () => {
+      const { getByText } = render(
+        <ServingSizePicker {...defaultProps} selectedId="non-existent" />
+      );
 
-  it('shows Close button in modal', async () => {
-    const { getByText } = render(<ServingSizePicker {...defaultProps} />);
-    
-    // Open modal
-    fireEvent.press(getByText('100 g'));
-    
-    await waitFor(() => {
-      expect(getByText('Close')).toBeTruthy();
+      expect(getByText('Select')).toBeTruthy();
     });
   });
 
-  it('closes modal when Close is pressed', async () => {
-    const onExpandedChange = jest.fn();
-    const { getByText } = render(
-      <ServingSizePicker {...defaultProps} onExpandedChange={onExpandedChange} />
-    );
-    
-    // Open modal
-    fireEvent.press(getByText('100 g'));
-    
-    await waitFor(() => {
-      expect(getByText('Close')).toBeTruthy();
+  describe('modal behavior', () => {
+    it('opens modal when trigger is pressed', async () => {
+      const onExpandedChange = jest.fn();
+      const { getByText } = render(
+        <ServingSizePicker {...defaultProps} onExpandedChange={onExpandedChange} />
+      );
+
+      fireEvent.press(getByText('100 g'));
+
+      await waitFor(() => {
+        expect(onExpandedChange).toHaveBeenCalledWith(true);
+      });
     });
-    
-    // Close modal
-    fireEvent.press(getByText('Close'));
-    
-    expect(onExpandedChange).toHaveBeenCalledWith(false);
+
+    it('displays modal title "Serving Size"', async () => {
+      const { getByText } = render(<ServingSizePicker {...defaultProps} />);
+
+      fireEvent.press(getByText('100 g'));
+
+      await waitFor(() => {
+        expect(getByText('Serving Size')).toBeTruthy();
+      });
+    });
+
+    it('displays all options in modal', async () => {
+      const { getByText } = render(<ServingSizePicker {...defaultProps} />);
+
+      fireEvent.press(getByText('100 g'));
+
+      await waitFor(() => {
+        expect(getByText('1 g')).toBeTruthy();
+        expect(getByText('1 serving')).toBeTruthy();
+        expect(getByText('1 cup (240 ml)')).toBeTruthy();
+      });
+    });
+
+    it('shows Close button in modal', async () => {
+      const { getByText } = render(<ServingSizePicker {...defaultProps} />);
+
+      fireEvent.press(getByText('100 g'));
+
+      await waitFor(() => {
+        expect(getByText('Close')).toBeTruthy();
+      });
+    });
+
+    it('closes modal when Close is pressed', async () => {
+      const onExpandedChange = jest.fn();
+      const { getByText } = render(
+        <ServingSizePicker {...defaultProps} onExpandedChange={onExpandedChange} />
+      );
+
+      fireEvent.press(getByText('100 g'));
+
+      await waitFor(() => {
+        expect(getByText('Close')).toBeTruthy();
+      });
+
+      fireEvent.press(getByText('Close'));
+
+      expect(onExpandedChange).toHaveBeenCalledWith(false);
+    });
   });
 
-  it('shows modal title "Serving Size"', async () => {
-    const { getByText } = render(<ServingSizePicker {...defaultProps} />);
-    
-    // Open modal
-    fireEvent.press(getByText('100 g'));
-    
-    await waitFor(() => {
-      expect(getByText('Serving Size')).toBeTruthy();
-    });
-  });
+  describe('option selection', () => {
+    it('calls onSelect when an option is chosen', async () => {
+      const onSelect = jest.fn();
+      const { getByText, getAllByText } = render(
+        <ServingSizePicker {...defaultProps} onSelect={onSelect} />
+      );
 
-  it('displays "Select" when no option matches selectedId', () => {
-    const { getByText } = render(
-      <ServingSizePicker {...defaultProps} selectedId="non-existent" />
-    );
-    
-    expect(getByText('Select')).toBeTruthy();
+      fireEvent.press(getByText('100 g'));
+
+      await waitFor(() => {
+        const servingOption = getAllByText('1 serving')[0];
+        fireEvent.press(servingOption);
+      });
+
+      expect(onSelect).toHaveBeenCalledWith('1serving');
+    });
   });
 });
