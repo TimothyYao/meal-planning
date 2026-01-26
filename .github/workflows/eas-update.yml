@@ -10,10 +10,32 @@ jobs:
     name: EAS Update
     runs-on: ubuntu-latest
     steps:
-      - name: Check for EXPO_TOKEN
+      - name: Check for secrets
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
+          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
+          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
         run: |
-          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "You must provide an EXPO_TOKEN secret linked to this project's Expo account in this repo's secrets. https://docs.expo.dev/eas-update/github-actions"
+          MISSING_SECRETS=0
+          
+          if [ -z "$EXPO_TOKEN" ]; then 
+            echo "::error::Missing EXPO_TOKEN secret. https://docs.expo.dev/eas-update/github-actions"
+            MISSING_SECRETS=1
+          fi
+
+          if [ -z "$EXPO_PUBLIC_FIREBASE_API_KEY" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_API_KEY secret"; MISSING_SECRETS=1; fi
+          if [ -z "$EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN secret"; MISSING_SECRETS=1; fi
+          if [ -z "$EXPO_PUBLIC_FIREBASE_PROJECT_ID" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_PROJECT_ID secret"; MISSING_SECRETS=1; fi
+          if [ -z "$EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET secret"; MISSING_SECRETS=1; fi
+          if [ -z "$EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID secret"; MISSING_SECRETS=1; fi
+          if [ -z "$EXPO_PUBLIC_FIREBASE_APP_ID" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_APP_ID secret"; MISSING_SECRETS=1; fi
+          
+          if [ $MISSING_SECRETS -eq 1 ]; then
+            echo "One or more required secrets are missing. Please add them in GitHub Repository Settings -> Secrets and variables -> Actions."
             exit 1
           fi
 
@@ -37,22 +59,7 @@ jobs:
 
       - name: Create update
         working-directory: ./apps/mobile
-        run: |
-          # Validate that required secrets are present
-          MISSING_SECRETS=0
-          if [ -z "$EXPO_PUBLIC_FIREBASE_API_KEY" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_API_KEY secret"; MISSING_SECRETS=1; fi
-          if [ -z "$EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN secret"; MISSING_SECRETS=1; fi
-          if [ -z "$EXPO_PUBLIC_FIREBASE_PROJECT_ID" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_PROJECT_ID secret"; MISSING_SECRETS=1; fi
-          if [ -z "$EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET secret"; MISSING_SECRETS=1; fi
-          if [ -z "$EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID secret"; MISSING_SECRETS=1; fi
-          if [ -z "$EXPO_PUBLIC_FIREBASE_APP_ID" ]; then echo "::error::Missing EXPO_PUBLIC_FIREBASE_APP_ID secret"; MISSING_SECRETS=1; fi
-          
-          if [ $MISSING_SECRETS -eq 1 ]; then
-            echo "One or more required Firebase secrets are missing. Please add them in GitHub Repository Settings -> Secrets and variables -> Actions."
-            exit 1
-          fi
-
-          eas update --branch production --message "Update from GitHub Actions: $(git log -1 --pretty=%B)"
+        run: eas update --branch production --message "Update from GitHub Actions: $(git log -1 --pretty=%B)"
         env:
           EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
           EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
