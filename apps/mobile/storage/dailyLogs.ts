@@ -11,57 +11,117 @@ import { generateFoodId, getTodayDate } from './utils';
 import { getUserTargetMacros } from './macros';
 
 /**
- * Compare two MacroTargets to see if they are different
+ * Compare two DailyLog objects to see if they are different
+ * Compares meals, totalMacros, and targetMacros
  */
-function areTargetsDifferent(target1: MacroTargets, target2: MacroTargets): boolean {
-  return (
-    target1.calories !== target2.calories ||
-    target1.protein !== target2.protein ||
-    target1.carbs !== target2.carbs ||
-    target1.fat !== target2.fat
-  );
+function areLogsDifferent(log1: DailyLog, log2: DailyLog): boolean {
+  // Compare target macros
+  if (
+    log1.targetMacros.calories !== log2.targetMacros.calories ||
+    log1.targetMacros.protein !== log2.targetMacros.protein ||
+    log1.targetMacros.carbs !== log2.targetMacros.carbs ||
+    log1.targetMacros.fat !== log2.targetMacros.fat
+  ) {
+    return true;
+  }
+
+  // Compare total macros
+  if (
+    log1.totalMacros.calories !== log2.totalMacros.calories ||
+    log1.totalMacros.protein !== log2.totalMacros.protein ||
+    log1.totalMacros.carbs !== log2.totalMacros.carbs ||
+    log1.totalMacros.fat !== log2.totalMacros.fat
+  ) {
+    return true;
+  }
+
+  // Compare meals count
+  if (log1.meals.length !== log2.meals.length) {
+    return true;
+  }
+
+  // Compare each meal
+  for (let i = 0; i < log1.meals.length; i++) {
+    const meal1 = log1.meals[i];
+    const meal2 = log2.meals[i];
+    
+    if (meal1.id !== meal2.id || meal1.name !== meal2.name) {
+      return true;
+    }
+    
+    if (meal1.foods.length !== meal2.foods.length) {
+      return true;
+    }
+    
+    // Compare foods in meal
+    for (let j = 0; j < meal1.foods.length; j++) {
+      const food1 = meal1.foods[j];
+      const food2 = meal2.foods[j];
+      
+      if (
+        food1.foodId !== food2.foodId ||
+        food1.quantity !== food2.quantity
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 /**
- * Asynchronously update daily log target macros from Firebase if different
+ * Asynchronously check and update daily log from Firebase if different
  * This runs in the background and doesn't block the return value
+ * 
+ * IMPORTANT: This function checks if the local version has changed before updating
+ * to avoid race conditions where user makes changes while sync is in progress
  */
-async function updateTargetMacrosFromFirebase(log: DailyLog): Promise<void> {
+async function updateLogFromFirebaseIfDifferent(log: DailyLog): Promise<void> {
   try {
     const user = getCurrentUser();
     if (!user) return;
 
-    // Fetch target macros from Firebase asynchronously
-    const profileData = await getUserProfileFromFirestore();
-    if (profileData?.targetMacros) {
-      const firebaseTargets = profileData.targetMacros;
-      
-      // Compare with current log targets
-      if (areTargetsDifferent(log.targetMacros, firebaseTargets)) {
-        console.log('[updateTargetMacrosFromFirebase] Target macros differ, updating log:', {
-          date: log.date,
-          current: log.targetMacros,
-          firebase: firebaseTargets,
-        });
-        
-        // Update the log with Firebase target macros
-        log.targetMacros = firebaseTargets;
-        
-        // Save updated log to local storage
+    // Store a snapshot of the log we're comparing against
+    const originalLogSnapshot = JSON.stringify(serializeDailyLog(log));
+
+    // Fetch the entire log from Firebase
+    const firebaseLog = await getDailyLogFromFirestore(log.date);
+    
+    if (firebaseLog) {
+      // Compare the entire log
+      if (areLogsDifferent(log, firebaseLog)) {
+        // Before updating, check if local storage has changed since we retrieved the log
+        // This prevents overwriting user changes that happened during the sync
         const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
         const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
-        const logToSave = serializeDailyLog(log);
+        const currentLocalLog = logs[log.date];
+        
+        if (currentLocalLog) {
+          // Check if local version has changed since we started
+          const currentLocalSnapshot = JSON.stringify(currentLocalLog);
+          if (currentLocalSnapshot !== originalLogSnapshot) {
+            console.log('[updateLogFromFirebaseIfDifferent] Local log changed during sync, skipping update to avoid overwriting user changes:', {
+              date: log.date,
+            });
+            return;
+          }
+        }
+        
+        console.log('[updateLogFromFirebaseIfDifferent] Log differs from Firebase, updating:', {
+          date: log.date,
+        });
+        
+        // Update local storage with Firebase version
+        const logToSave = serializeDailyLog(firebaseLog);
         logs[log.date] = logToSave;
         await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
         
-        // Also save to Firestore
-        await saveDailyLogToFirestore(log);
-        
-        console.log('[updateTargetMacrosFromFirebase] Successfully updated target macros for', log.date);
+        console.log('[updateLogFromFirebaseIfDifferent] Successfully updated log from Firebase for', log.date);
       }
     }
   } catch (error) {
-    console.error('[updateTargetMacrosFromFirebase] Error updating target macros from Firebase:', error);
+    console.error('[updateLogFromFirebaseIfDifferent] Error updating log from Firebase:', error);
     // Don't throw - this is a background operation
   }
 }
@@ -186,9 +246,9 @@ export async function getTodayLog(): Promise<DailyLog | null> {
             firestoreLog.targetMacros = await getUserTargetMacros();
           }
           
-          // Asynchronously check and update target macros from Firebase if different
-          updateTargetMacrosFromFirebase(firestoreLog).catch((error) => {
-            console.error('Error updating target macros from Firebase:', error);
+          // Asynchronously check and update entire log from Firebase if different
+          updateLogFromFirebaseIfDifferent(firestoreLog).catch((error) => {
+            console.error('Error updating log from Firebase:', error);
           });
           
           return firestoreLog;
@@ -210,9 +270,9 @@ export async function getTodayLog(): Promise<DailyLog | null> {
         dailyLog.targetMacros = await getUserTargetMacros();
       }
       
-      // Asynchronously check and update target macros from Firebase if different
-      updateTargetMacrosFromFirebase(dailyLog).catch((error) => {
-        console.error('Error updating target macros from Firebase:', error);
+      // Asynchronously check and update entire log from Firebase if different
+      updateLogFromFirebaseIfDifferent(dailyLog).catch((error) => {
+        console.error('Error updating log from Firebase:', error);
       });
       
       return dailyLog;
@@ -254,9 +314,9 @@ export async function getLogForDate(date: string): Promise<DailyLog | null> {
         dailyLog.targetMacros = await getUserTargetMacros();
       }
       
-      // Asynchronously check and update target macros from Firebase if different
-      updateTargetMacrosFromFirebase(dailyLog).catch((error) => {
-        console.error('Error updating target macros from Firebase:', error);
+      // Asynchronously check and update entire log from Firebase if different
+      updateLogFromFirebaseIfDifferent(dailyLog).catch((error) => {
+        console.error('Error updating log from Firebase:', error);
       });
       
       console.log(`[getLogForDate] Returning daily log with ${dailyLog.meals.length} meals, total foods:`, 
@@ -277,9 +337,9 @@ export async function getLogForDate(date: string): Promise<DailyLog | null> {
             firestoreLog.targetMacros = await getUserTargetMacros();
           }
           
-          // Asynchronously check and update target macros from Firebase if different
-          updateTargetMacrosFromFirebase(firestoreLog).catch((error) => {
-            console.error('Error updating target macros from Firebase:', error);
+          // Asynchronously check and update entire log from Firebase if different
+          updateLogFromFirebaseIfDifferent(firestoreLog).catch((error) => {
+            console.error('Error updating log from Firebase:', error);
           });
           
           return firestoreLog;
