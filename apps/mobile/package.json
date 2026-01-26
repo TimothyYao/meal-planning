@@ -10,6 +10,7 @@
     "publish": "eas update --branch production --message \"Published update\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "test": "jest",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json}\""
   },
@@ -44,11 +45,14 @@
     "react-native-webview": "13.15.0"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.0",
     "@typescript-eslint/eslint-plugin": "^8.46.4",
     "@typescript-eslint/parser": "^8.46.4",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^9.1.0",
+    "jest": "^29.7.0",
+    "jest-expo": "^54.0.16",
     "prettier": "^3.3.3",
     "typescript": "~5.9.2"
   },
