@@ -153,3 +153,31 @@ export async function getFoodById(foodId: string): Promise<FoodItem | null> {
     return null;
   }
 }
+
+/**
+ * Delete a food item from the database
+ * Also removes it from Firestore if authenticated
+ */
+export async function deleteFood(foodId: string): Promise<void> {
+  try {
+    // STEP 1: Remove from local storage
+    const foodsJson = await AsyncStorage.getItem(FOODS_KEY);
+    if (foodsJson) {
+      const foods: FoodItem[] = JSON.parse(foodsJson);
+      const filteredFoods = foods.filter(f => f.id !== foodId);
+      await AsyncStorage.setItem(FOODS_KEY, JSON.stringify(filteredFoods));
+    }
+    
+    // STEP 2: Remove from Firestore (async, non-blocking)
+    const user = getCurrentUser();
+    if (user) {
+      const { deleteFoodFromFirestore } = await import('../utils/firestore');
+      deleteFoodFromFirestore(foodId).catch((error) => {
+        console.error('Error deleting food from Firestore:', error);
+      });
+    }
+  } catch (error) {
+    console.error('Error deleting food:', error);
+    throw error;
+  }
+}

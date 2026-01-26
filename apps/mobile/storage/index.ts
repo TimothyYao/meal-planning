@@ -13,6 +13,7 @@ export {
   saveFood,
   getFoods,
   getFoodById,
+  deleteFood,
 } from './foods';
 
 // Daily log operations

@@ -23,6 +23,7 @@ import ProfileScreen from './screens/ProfileScreen';
 import PhoneAuthScreen from './screens/PhoneAuthScreen';
 import FoodDetailScreen from './screens/FoodDetailScreen';
 import EditFoodScreen from './screens/EditFoodScreen';
+import SearchFoodScreen from './screens/SearchFoodScreen';
 import FloatingAddMenu from './components/FloatingAddMenu';
 
 const Tab = createBottomTabNavigator();
@@ -152,6 +153,7 @@ const linking = {
         },
       },
       AddFood: 'add-food/custom',
+      SearchFood: 'add-food/search',
       PhoneAuth: 'phone-auth',
     },
   },
@@ -167,6 +169,13 @@ export default function App() {
     hideFloatingAddMenu();
     if (navigationRef.current) {
       navigationRef.current.navigate('AddFood' as never);
+    }
+  };
+
+  const handleSearch = () => {
+    hideFloatingAddMenu();
+    if (navigationRef.current) {
+      navigationRef.current.navigate('SearchFood' as never);
     }
   };
 
@@ -195,6 +204,14 @@ export default function App() {
                 }}
               />
               <Stack.Screen
+                name="SearchFood"
+                component={SearchFoodScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'fullScreenModal',
+                }}
+              />
+              <Stack.Screen
                 name="PhoneAuth"
                 component={PhoneAuthScreen}
                 options={{
@@ -208,6 +225,7 @@ export default function App() {
             visible={floatingMenuVisible}
             onClose={() => setFloatingMenuVisibleState(false)}
             onCustomFood={handleCustomFood}
+            onSearch={handleSearch}
           />
         </SafeAreaProvider>
       </GestureHandlerRootView>

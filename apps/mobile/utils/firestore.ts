@@ -161,6 +161,26 @@ export async function getFoodsFromFirestore(): Promise<FoodItem[]> {
 /**
  * Get a food by ID from Firestore
  */
+export async function deleteFoodFromFirestore(foodId: string): Promise<void> {
+  const user = getCurrentUser();
+  if (!user) {
+    throw new Error('User must be authenticated to delete from Firestore');
+  }
+
+  try {
+    const foodRef = doc(db, getUserPath('foods'), foodId);
+    await deleteDoc(foodRef);
+    
+    // Remove from local cache
+    const cached = await getCachedData('foods') || [];
+    const filtered = cached.filter((f: FoodItem) => f.id !== foodId);
+    await cacheData('foods', filtered);
+  } catch (error) {
+    console.error('Error deleting food from Firestore:', error);
+    throw error;
+  }
+}
+
 export async function getFoodByIdFromFirestore(foodId: string): Promise<FoodItem | null> {
   const user = getCurrentUser();
   if (!user) {

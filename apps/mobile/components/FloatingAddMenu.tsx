@@ -12,9 +12,10 @@ interface FloatingAddMenuProps {
   visible: boolean;
   onClose: () => void;
   onCustomFood: () => void;
+  onSearch: () => void;
 }
 
-export default function FloatingAddMenu({ visible, onClose, onCustomFood }: FloatingAddMenuProps) {
+export default function FloatingAddMenu({ visible, onClose, onCustomFood, onSearch }: FloatingAddMenuProps) {
   const insets = useSafeAreaInsets();
   const [recentFoods, setRecentFoods] = useState<Array<{ food: FoodItem; lastAdded: Date }>>([]);
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -97,11 +98,17 @@ export default function FloatingAddMenu({ visible, onClose, onCustomFood }: Floa
     Alert.alert('Coming Soon', 'Recipe creation feature will be available soon.');
   };
 
+  const handleSearch = () => {
+    onClose();
+    onSearch();
+  };
+
   if (!visible) return null;
 
   const recipeButton = { icon: 'restaurant-outline' as const, label: 'Recipe', onPress: handleCreateRecipe, color: '#007AFF' };
   const scanButton = { icon: 'camera-outline' as const, label: 'Scan', onPress: handleNutritionLabelScan, color: '#007AFF' };
   const customButton = { icon: 'create-outline' as const, label: 'Custom', onPress: onCustomFood, color: '#007AFF' };
+  const searchButton = { icon: 'search-outline' as const, label: 'Search', onPress: handleSearch, color: '#007AFF' };
 
   return (
     <Modal
@@ -216,6 +223,27 @@ export default function FloatingAddMenu({ visible, onClose, onCustomFood }: Floa
                   </TouchableOpacity>
                 </Animated.View>
               )}
+            </Animated.View>
+
+            {/* Search button in third row */}
+            <Animated.View
+              style={[
+                styles.buttonWrapper,
+                {
+                  opacity: opacityAnim,
+                  transform: [{ scale: scaleAnim }],
+                  marginTop: SPACING,
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={[styles.squareButton, { backgroundColor: searchButton.color }]}
+                onPress={searchButton.onPress}
+                activeOpacity={0.8}
+              >
+                <Ionicons name={searchButton.icon} size={24} color="#fff" />
+                <Text style={styles.buttonLabel}>{searchButton.label}</Text>
+              </TouchableOpacity>
             </Animated.View>
           </View>
         </View>
