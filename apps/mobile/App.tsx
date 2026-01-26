@@ -1,16 +1,11 @@
 /**
- * NOTE: Using React Navigation 7.0.0 due to compatibility issues with React 19.
- * 
+ * NOTE: Using React Navigation 7.0.x with native@7.0.3 (override) for LinkingContext.
+ * Root package.json overrides @react-navigation/native to 7.0.3 so bottom-tabs/elements
+ * resolve to a single version and avoid "Couldn't find a LinkingContext context".
+ *
  * React Navigation 7.1.27+ and 7.9.1+ have a known bug with React 19.1.0:
  * https://github.com/react-navigation/react-navigation/issues/12921
- * 
  * Error: "TypeError: expected dynamic type 'boolean', but had type 'string'"
- * 
- * React Navigation 7.0.0 is being used as a workaround. If issues persist,
- * consider:
- * - Using React Navigation 8 alpha (requires dev build, not Expo Go)
- * - Waiting for React Navigation 8 stable release
- * - Using a custom tab navigation solution
  */
 
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
@@ -19,16 +14,17 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { AuthProvider } from './contexts/AuthContext';
 import HomeScreen from './screens/HomeScreen';
 import AddFoodScreen from './screens/AddFoodScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import PhoneAuthScreen from './screens/PhoneAuthScreen';
 import FoodDetailScreen from './screens/FoodDetailScreen';
 import EditFoodScreen from './screens/EditFoodScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// Navigation ref to access root navigator
 export const navigationRef = { current: null as NavigationContainerRef<any> | null };
 
 function HomeStack() {
@@ -91,16 +87,11 @@ function TabNavigator() {
         listeners={({ navigation }) => ({
           tabPress: (e) => {
             e.preventDefault();
-            // Try multiple ways to navigate to AddFood modal
-            const rootNavigation = navigation.getParent();
-            if (rootNavigation) {
-              (rootNavigation as any).navigate('AddFood');
-            } else if (navigationRef.current) {
+            const root = navigation.getParent();
+            if (root) (root as any).navigate('AddFood');
+            else if (navigationRef.current)
               navigationRef.current.navigate('AddFood' as never);
-            } else {
-              // Fallback: try navigating through the navigation state
-              (navigation as any).navigate('AddFood');
-            }
+            else (navigation as any).navigate('AddFood');
           },
         })}
       />
@@ -118,32 +109,68 @@ function TabNavigator() {
   );
 }
 
+const linking = {
+  prefixes: [],
+  config: {
+    screens: {
+      MainTabs: {
+        path: '',
+        screens: {
+          Home: {
+            path: 'home',
+            screens: {
+              HomeMain: '',
+              FoodDetail: 'food/:foodId',
+              EditFood: 'food/:foodId/edit',
+            },
+          },
+          AddFoodTab: 'add-food',
+          Profile: 'profile',
+        },
+      },
+      AddFood: 'add-food',
+      PhoneAuth: 'phone-auth',
+    },
+  },
+};
+
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <NavigationContainer
-          ref={(ref) => {
-            navigationRef.current = ref;
-          }}
-        >
-          <Stack.Navigator>
-            <Stack.Screen
-              name="MainTabs"
-              component={TabNavigator}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="AddFood"
-              component={AddFoodScreen}
-              options={{
-                headerShown: false,
-                presentation: 'fullScreenModal',
-              }}
-            />
-          </Stack.Navigator>
-        </NavigationContainer>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <AuthProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <NavigationContainer
+            ref={(ref) => {
+              navigationRef.current = ref;
+            }}
+            linking={linking}
+          >
+            <Stack.Navigator>
+              <Stack.Screen
+                name="MainTabs"
+                component={TabNavigator}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="AddFood"
+                component={AddFoodScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'fullScreenModal',
+                }}
+              />
+              <Stack.Screen
+                name="PhoneAuth"
+                component={PhoneAuthScreen}
+                options={{
+                  title: 'Sign in with phone',
+                  presentation: 'modal',
+                }}
+              />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </AuthProvider>
   );
 }

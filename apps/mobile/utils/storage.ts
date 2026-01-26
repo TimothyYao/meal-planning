@@ -1,6 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { DailyLog, MealFood, FoodItem, MacroTargets, calculateMacros, Meal } from '@meal-planning/shared';
+import { getCurrentUser } from './auth';
+import {
+  saveFoodToFirestore,
+  getFoodsFromFirestore,
+  getFoodByIdFromFirestore,
+  saveDailyLogToFirestore,
+  getDailyLogFromFirestore,
+  syncLocalCacheToFirestore,
+} from './firestore';
 
 const DAILY_LOGS_KEY = '@meal_planning:daily_logs';
 const FOODS_KEY = '@meal_planning:foods';
@@ -10,18 +19,23 @@ const LAST_FAT_KEY = '@meal_planning:last_fat';
 
 // Generate a UUID for food items
 export async function generateFoodId(): Promise<string> {
-  return await Crypto.randomUUID();
+  return Crypto.randomUUID();
 }
 
-// Get today's date in YYYY-MM-DD format
+// Get today's date in YYYY-MM-DD format (using local time, not UTC)
 export function getTodayDate(): string {
   const today = new Date();
-  return today.toISOString().split('T')[0];
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // Save a food item to the food database and update all instances in daily logs
+// Writes to cache first, then Firebase (for better offline support)
 export async function saveFood(food: FoodItem): Promise<void> {
   try {
+    // STEP 1: Save to local storage first (cache) for immediate availability
     const foodsJson = await AsyncStorage.getItem(FOODS_KEY);
     const foods: FoodItem[] = foodsJson ? JSON.parse(foodsJson) : [];
     
@@ -34,6 +48,17 @@ export async function saveFood(food: FoodItem): Promise<void> {
     }
     
     await AsyncStorage.setItem(FOODS_KEY, JSON.stringify(foods));
+    
+    // STEP 2: Then save to Firestore (async, non-blocking)
+    const user = getCurrentUser();
+    if (user) {
+      // Firestore save happens after cache, but we don't wait for it to complete
+      // This ensures the UI is responsive even if Firestore is slow
+      saveFoodToFirestore(food).catch((error) => {
+        console.error('Error saving food to Firestore (will retry on sync):', error);
+        // Food is already in cache, so it will sync later
+      });
+    }
     
     // Also update all instances of this food in daily logs
     const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
@@ -111,6 +136,21 @@ export async function saveFood(food: FoodItem): Promise<void> {
 // Get all saved foods
 export async function getFoods(): Promise<FoodItem[]> {
   try {
+    const user = getCurrentUser();
+    
+    // If authenticated, try to get from Firestore first (which caches locally)
+    if (user) {
+      try {
+        const firestoreFoods = await getFoodsFromFirestore();
+        if (firestoreFoods.length > 0) {
+          return firestoreFoods;
+        }
+      } catch (error) {
+        console.error('Error getting foods from Firestore, falling back to local:', error);
+      }
+    }
+    
+    // Fallback to local storage
     const foodsJson = await AsyncStorage.getItem(FOODS_KEY);
     return foodsJson ? JSON.parse(foodsJson) : [];
   } catch (error) {
@@ -122,6 +162,19 @@ export async function getFoods(): Promise<FoodItem[]> {
 // Get a food by ID
 export async function getFoodById(foodId: string): Promise<FoodItem | null> {
   try {
+    const user = getCurrentUser();
+    
+    // If authenticated, try to get from Firestore first
+    if (user) {
+      try {
+        const food = await getFoodByIdFromFirestore(foodId);
+        if (food) return food;
+      } catch (error) {
+        console.error('Error getting food from Firestore, falling back to local:', error);
+      }
+    }
+    
+    // Fallback to local storage
     const foodsJson = await AsyncStorage.getItem(FOODS_KEY);
     if (!foodsJson) return null;
     const foods: FoodItem[] = JSON.parse(foodsJson);
@@ -197,6 +250,33 @@ export async function addFoodToDate(food: FoodItem, quantity: number = 1, date: 
     // Save updated log
     logs[date] = logToSave;
     await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
+    console.log(`[addFoodToDate] Saved log for ${date}, meals count:`, logToSave.meals.length, 
+      'total foods:', logToSave.meals.reduce((sum: number, m: any) => sum + m.foods.length, 0));
+    
+    // If authenticated, also save to Firestore (async, non-blocking)
+    const user = getCurrentUser();
+    if (user) {
+      // Firestore save happens after cache, but we don't wait for it to complete
+      // This ensures the UI is responsive even if Firestore is slow
+      // Convert logToSave back to DailyLog format (with Date objects for Firestore)
+      const dailyLog: DailyLog = {
+        date: logToSave.date,
+        meals: logToSave.meals.map((meal: any) => ({
+          ...meal,
+          timestamp: typeof meal.timestamp === 'string' ? new Date(meal.timestamp) : meal.timestamp,
+          foods: meal.foods.map((mealFood: any) => ({
+            ...mealFood,
+            addedAt: typeof mealFood.addedAt === 'string' ? new Date(mealFood.addedAt) : mealFood.addedAt,
+          })),
+        })),
+        totalMacros: logToSave.totalMacros,
+        targetMacros: logToSave.targetMacros,
+      };
+      saveDailyLogToFirestore(dailyLog).catch((error) => {
+        console.error('Error saving daily log to Firestore (will retry on sync):', error);
+        // Log is already in cache, so it will sync later
+      });
+    }
   } catch (error) {
     console.error('Error adding food to date:', error);
     throw error;
@@ -213,6 +293,19 @@ export async function addFoodToToday(food: FoodItem, quantity: number = 1): Prom
 export async function getTodayLog(): Promise<DailyLog | null> {
   try {
     const today = getTodayDate();
+    const user = getCurrentUser();
+    
+    // If authenticated, try to get from Firestore first
+    if (user) {
+      try {
+        const firestoreLog = await getDailyLogFromFirestore(today);
+        if (firestoreLog) return firestoreLog;
+      } catch (error) {
+        console.error('Error getting daily log from Firestore, falling back to local:', error);
+      }
+    }
+    
+    // Fallback to local storage
     const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
     const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
     const log = logs[today];
@@ -241,25 +334,50 @@ export async function getTodayLog(): Promise<DailyLog | null> {
 // Get log for a specific date
 export async function getLogForDate(date: string): Promise<DailyLog | null> {
   try {
+    // Always read from local storage first (cache-first strategy)
+    // This ensures we get the latest data immediately after writes
     const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
     const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
     const log = logs[date];
-    if (!log) return null;
     
-    // Convert timestamp strings back to Date objects
-    const dailyLog: DailyLog = {
-      ...log,
-      meals: log.meals.map((meal: any) => ({
-        ...meal,
-        timestamp: new Date(meal.timestamp),
-        foods: meal.foods.map((mealFood: any) => ({
-          ...mealFood,
-          addedAt: mealFood.addedAt ? new Date(mealFood.addedAt) : undefined,
+    // If we have local data, use it (it's the most up-to-date)
+    if (log) {
+      console.log(`[getLogForDate] Found local log for ${date}, meals count:`, log.meals?.length || 0);
+      // Convert timestamp strings back to Date objects
+      const dailyLog: DailyLog = {
+        ...log,
+        meals: log.meals.map((meal: any) => ({
+          ...meal,
+          timestamp: typeof meal.timestamp === 'string' 
+            ? new Date(meal.timestamp) 
+            : (meal.timestamp instanceof Date ? meal.timestamp : new Date()),
+          foods: meal.foods.map((mealFood: any) => ({
+            ...mealFood,
+            addedAt: typeof mealFood.addedAt === 'string' 
+              ? new Date(mealFood.addedAt) 
+              : (mealFood.addedAt instanceof Date ? mealFood.addedAt : new Date()),
+          })),
         })),
-      })),
-    };
+      };
+      console.log(`[getLogForDate] Returning daily log with ${dailyLog.meals.length} meals, total foods:`, 
+        dailyLog.meals.reduce((sum, m) => sum + m.foods.length, 0));
+      return dailyLog;
+    }
     
-    return dailyLog;
+    console.log(`[getLogForDate] No local log found for ${date}`);
+    
+    // If no local data and authenticated, try Firestore
+    const user = getCurrentUser();
+    if (user) {
+      try {
+        const firestoreLog = await getDailyLogFromFirestore(date);
+        if (firestoreLog) return firestoreLog;
+      } catch (error) {
+        console.error('Error getting daily log from Firestore:', error);
+      }
+    }
+    
+    return null;
   } catch (error) {
     console.error('Error getting log for date:', error);
     return null;
@@ -549,8 +667,32 @@ export async function setTodayTargetMacros(targets: MacroTargets): Promise<void>
     }
     
     await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
+    
+    // If authenticated, also save to Firestore
+    const user = getCurrentUser();
+    if (user) {
+      try {
+        await saveDailyLogToFirestore(logs[today]);
+      } catch (error) {
+        console.error('Error saving target macros to Firestore:', error);
+        // Continue even if Firestore save fails
+      }
+    }
   } catch (error) {
     console.error('Error setting target macros:', error);
+    throw error;
+  }
+}
+
+// Sync local data to Firestore (useful when coming back online)
+export async function syncToFirestore(): Promise<void> {
+  try {
+    const user = getCurrentUser();
+    if (!user) return;
+    
+    await syncLocalCacheToFirestore();
+  } catch (error) {
+    console.error('Error syncing to Firestore:', error);
     throw error;
   }
 }

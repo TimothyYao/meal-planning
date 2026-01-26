@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { DailyLog, formatMacroValue, MealFood } from '@meal-planning/shared';
@@ -33,15 +34,7 @@ export default function HomeScreen() {
     return `${year}-${month}-${day}`;
   };
 
-  useEffect(() => {
-    loadDateLog();
-    
-    // Refresh when screen comes into focus
-    const interval = setInterval(loadDateLog, 2000); // Refresh every 2 seconds
-    return () => clearInterval(interval);
-  }, [selectedDate]);
-
-  const loadDateLog = async () => {
+  const loadDateLog = useCallback(async () => {
     try {
       const dateString = formatDateString(selectedDate);
       const log = await getLogForDate(dateString);
@@ -51,7 +44,22 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    loadDateLog();
+  }, [loadDateLog]);
+
+  // Refresh when screen comes into focus (e.g., after copying food)
+  useFocusEffect(
+    useCallback(() => {
+      // Small delay to ensure data is written to cache
+      const timer = setTimeout(() => {
+        loadDateLog();
+      }, 100);
+      return () => clearTimeout(timer);
+    }, [loadDateLog])
+  );
 
   const isToday = (date: Date): boolean => {
     const today = new Date();
@@ -203,7 +211,10 @@ export default function HomeScreen() {
     return `${qtyText} ${label} • ${formatServingSize(servingSize, servingUnit)}`;
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (date: Date | undefined) => {
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+      return '';
+    }
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',

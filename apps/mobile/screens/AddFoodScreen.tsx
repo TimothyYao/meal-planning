@@ -1,10 +1,11 @@
-import { StyleSheet, Text, View, Alert, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, Alert, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { FoodItem } from '@meal-planning/shared';
 import { saveFood, addFoodToDate } from '../utils/storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
+import { safeGoBack } from '../utils/navigation';
 
 type AddFoodRouteParams = {
   duplicateFood?: FoodItem;
@@ -18,6 +19,7 @@ export default function AddFoodScreen() {
   const route = useRoute<AddFoodRouteProp>();
   const duplicateFood = route.params?.duplicateFood;
   const formRef = useRef<FoodFormRef>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Format date to YYYY-MM-DD
   const formatDateString = (date: Date): string => {
@@ -37,8 +39,11 @@ export default function AddFoodScreen() {
   };
 
   const handleSave = async (foodItem: FoodItem, quantity: number, date?: Date) => {
+    if (isSaving) return; // Prevent multiple saves
+    
+    setIsSaving(true);
     try {
-      // Save food to database
+      // Save food to database (cache first, then Firebase)
       await saveFood(foodItem);
       
       // Add to selected date's log
@@ -51,13 +56,15 @@ export default function AddFoodScreen() {
         {
           text: 'OK',
           onPress: () => {
-            navigation.goBack();
+            safeGoBack(navigation);
           },
         },
       ]);
     } catch (error) {
       console.error('Error saving food:', error);
       Alert.alert('Error', 'Failed to save food. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -66,13 +73,13 @@ export default function AddFoodScreen() {
   };
 
   const handleSavePress = async () => {
-    if (formRef.current) {
-      await formRef.current.save();
-    }
+    if (isSaving || !formRef.current) return;
+    await formRef.current.save();
   };
 
   const handleCancel = () => {
-    navigation.goBack();
+    if (isSaving) return; // Prevent cancel during save
+    safeGoBack(navigation);
   };
 
   return (
@@ -104,19 +111,25 @@ export default function AddFoodScreen() {
 
       <View style={[styles.bottomButtonContainer, { paddingBottom: insets.bottom + 20 }]}>
         <TouchableOpacity 
-          style={styles.cancelButton} 
+          style={[styles.cancelButton, isSaving && styles.buttonDisabled]} 
           onPress={handleCancel}
           activeOpacity={0.7}
+          disabled={isSaving}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.saveButton} 
+          style={[styles.saveButton, isSaving && styles.buttonDisabled]} 
           onPress={handleSavePress}
           activeOpacity={0.8}
+          disabled={isSaving}
         >
-          <Text style={styles.saveButtonText}>Save</Text>
+          {isSaving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.saveButtonText}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -188,5 +201,8 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 17,
     fontWeight: '400',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });

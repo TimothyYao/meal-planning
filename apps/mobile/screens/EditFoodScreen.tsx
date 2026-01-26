@@ -1,10 +1,11 @@
-import { StyleSheet, Text, View, Alert, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, Alert, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useRef, useState } from 'react';
 import { FoodItem } from '@meal-planning/shared';
 import { saveFood, getFoodById, updateFoodQuantityInDate, moveFoodToDate, getTodayDate } from '../utils/storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
+import { safeGoBack } from '../utils/navigation';
 
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
@@ -27,6 +28,7 @@ export default function EditFoodScreen() {
   const [food, setFood] = useState<FoodItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentQuantity, setCurrentQuantity] = useState(initialQuantity);
+  const [isSaving, setIsSaving] = useState(false);
   const formRef = useRef<FoodFormRef>(null);
   const isExistingLog = mealId !== undefined && foodIndex !== undefined;
 
@@ -46,7 +48,11 @@ export default function EditFoodScreen() {
   );
 
   const handleSave = async (editedFood: FoodItem, quantity: number, newDate?: Date) => {
+    if (isSaving) return; // Prevent multiple saves
+    
+    setIsSaving(true);
     try {
+      // Save food to database (cache first, then Firebase)
       await saveFood(editedFood);
       
       // If this is an existing log entry, update the quantity and potentially move the date
@@ -66,10 +72,12 @@ export default function EditFoodScreen() {
         }
       }
       
-      navigation.goBack();
+      safeGoBack(navigation);
     } catch (error) {
       console.error('Error updating food:', error);
       Alert.alert('Error', 'Failed to update food. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -86,13 +94,13 @@ export default function EditFoodScreen() {
   };
 
   const handleSavePress = async () => {
-    if (formRef.current) {
-      await formRef.current.save();
-    }
+    if (isSaving || !formRef.current) return;
+    await formRef.current.save();
   };
 
   const handleCancel = () => {
-    navigation.goBack();
+    if (isSaving) return; // Prevent cancel during save
+    safeGoBack(navigation);
   };
 
   if (loading || !food) {
@@ -134,19 +142,25 @@ export default function EditFoodScreen() {
 
       <View style={[styles.bottomButtonContainer, { paddingBottom: insets.bottom + 20 }]}>
         <TouchableOpacity 
-          style={styles.cancelButton} 
+          style={[styles.cancelButton, isSaving && styles.buttonDisabled]} 
           onPress={handleCancel}
           activeOpacity={0.7}
+          disabled={isSaving}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.saveButton} 
+          style={[styles.saveButton, isSaving && styles.buttonDisabled]} 
           onPress={handleSavePress}
           activeOpacity={0.8}
+          disabled={isSaving}
         >
-          <Text style={styles.saveButtonText}>Save</Text>
+          {isSaving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.saveButtonText}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -218,5 +232,8 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 17,
     fontWeight: '400',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });

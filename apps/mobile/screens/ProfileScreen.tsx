@@ -6,15 +6,31 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { UserProfile, MacroTargets, formatMacroValue, calculateCaloriesFromMacros } from '@meal-planning/shared';
 import { getTodayLog, setTodayTargetMacros } from '../utils/storage';
 import { NumberEditor } from '../components/NumberEditor';
+import { Picker } from '@react-native-picker/picker';
+import { useAuth } from '../contexts/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from '../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { updateProfile } from 'firebase/auth';
+import { auth } from '../config/firebase';
+import { saveUserProfileToFirestore, getUserProfileFromFirestore } from '../utils/firestore';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const { user, loading: authLoading, signOut } = useAuth();
+
   // Example profile data - in a real app, this would come from state/storage
   const profile: UserProfile = {
     id: '1',
@@ -23,7 +39,6 @@ export default function ProfileScreen() {
     age: 30,
     height: 175, // cm
     weight: 75, // kg
-    activityLevel: 'moderate',
     goal: 'maintain',
     targetMacros: {
       calories: 2000,
@@ -42,13 +57,55 @@ export default function ProfileScreen() {
   const [originalTargets, setOriginalTargets] = useState<MacroTargets | null>(null);
   const [editingField, setEditingField] = useState<'calories' | 'protein' | 'carbs' | 'fat' | null>(null);
   const [autoCalculateCalories, setAutoCalculateCalories] = useState(true);
+  const [displayName, setDisplayName] = useState<string>('');
+  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
+  const [originalDisplayName, setOriginalDisplayName] = useState<string>('');
+  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [hasSavedTargets, setHasSavedTargets] = useState(false);
+  const [age, setAge] = useState<number | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  const [weight, setWeight] = useState<number | null>(null);
+  const [goal, setGoal] = useState<'lose' | 'maintain' | 'gain' | null>(null);
+  const [editingPersonalField, setEditingPersonalField] = useState<'age' | 'height' | 'weight' | 'goal' | null>(null);
+
+  const DISPLAY_NAME_KEY = '@meal_planning:display_name';
+  const PROFILE_IMAGE_KEY = '@meal_planning:profile_image';
+  const HAS_SAVED_TARGETS_KEY = '@meal_planning:has_saved_targets';
 
   useEffect(() => {
     loadTargets();
-  }, []);
+    loadDisplayName();
+    loadProfileImage();
+    loadPersonalInfo();
+  }, [user]);
 
   const loadTargets = async () => {
     try {
+      // Check if user has saved targets before
+      const hasSaved = await AsyncStorage.getItem(HAS_SAVED_TARGETS_KEY);
+      const hasSavedBefore = hasSaved === 'true';
+      setHasSavedTargets(hasSavedBefore);
+
+      if (hasSavedBefore && user) {
+        // Load from Firestore if user has saved before
+        try {
+          const profileData = await getUserProfileFromFirestore();
+          if (profileData?.targetMacros) {
+            setCalories(profileData.targetMacros.calories);
+            setProtein(profileData.targetMacros.protein);
+            setCarbs(profileData.targetMacros.carbs);
+            setFat(profileData.targetMacros.fat);
+            setOriginalTargets(profileData.targetMacros);
+            setLoading(false);
+            return;
+          }
+        } catch (firestoreError) {
+          console.log('Could not load targets from Firestore, using defaults:', firestoreError);
+        }
+      }
+
+      // Fallback to today's log or defaults
       const todayLog = await getTodayLog();
       if (todayLog?.targetMacros) {
         setCalories(todayLog.targetMacros.calories);
@@ -58,6 +115,10 @@ export default function ProfileScreen() {
         setOriginalTargets(todayLog.targetMacros);
       } else {
         const defaults = { calories: 2000, protein: 150, carbs: 200, fat: 65 };
+        setCalories(defaults.calories);
+        setProtein(defaults.protein);
+        setCarbs(defaults.carbs);
+        setFat(defaults.fat);
         setOriginalTargets(defaults);
       }
     } catch (error) {
@@ -65,6 +126,237 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadDisplayName = async () => {
+    try {
+      if (user) {
+        // Try to load from Firestore first (follows security rules)
+        try {
+          const profileData = await getUserProfileFromFirestore();
+          if (profileData?.displayName) {
+            setDisplayName(profileData.displayName);
+            setOriginalDisplayName(profileData.displayName);
+            await AsyncStorage.setItem(DISPLAY_NAME_KEY, profileData.displayName);
+            return;
+          }
+        } catch (firestoreError) {
+          console.log('Could not load from Firestore, trying cache:', firestoreError);
+        }
+
+        // Fallback to local storage
+        const savedName = await AsyncStorage.getItem(DISPLAY_NAME_KEY);
+        if (savedName) {
+          setDisplayName(savedName);
+          setOriginalDisplayName(savedName);
+        } else if (user.displayName) {
+          // Use Firebase Auth display name if available
+          setDisplayName(user.displayName);
+          setOriginalDisplayName(user.displayName);
+        } else {
+          // Default to "User"
+          setDisplayName('User');
+          setOriginalDisplayName('User');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading display name:', error);
+    }
+  };
+
+  const handleSaveDisplayName = async () => {
+    try {
+      const trimmedName = displayName.trim();
+      if (!trimmedName) {
+        Alert.alert('Error', 'Display name cannot be empty');
+        setDisplayName(originalDisplayName);
+        setIsEditingDisplayName(false);
+        return;
+      }
+      
+      // Save to AsyncStorage (cache)
+      await AsyncStorage.setItem(DISPLAY_NAME_KEY, trimmedName);
+      
+      // Save to Firestore (follows security rules)
+      await saveUserProfileToFirestore({ displayName: trimmedName });
+      
+      // Update Firebase Auth profile (optional, for consistency)
+      try {
+        if (auth.currentUser) {
+          await updateProfile(auth.currentUser, { displayName: trimmedName });
+        }
+      } catch (firebaseError) {
+        // Firebase Auth update is optional, Firestore is primary
+        console.log('Firebase Auth profile update skipped:', firebaseError);
+      }
+      
+      setOriginalDisplayName(trimmedName);
+      setIsEditingDisplayName(false);
+    } catch (error) {
+      console.error('Error saving display name:', error);
+      Alert.alert('Error', 'Failed to save display name. Please try again.');
+    }
+  };
+
+  const handleCancelDisplayName = () => {
+    setDisplayName(originalDisplayName);
+    setIsEditingDisplayName(false);
+  };
+
+  const loadProfileImage = async () => {
+    try {
+      if (user) {
+        // Try to load from Firestore first (follows security rules)
+        try {
+          const profileData = await getUserProfileFromFirestore();
+          if (profileData?.photoURL) {
+            setProfileImageUri(profileData.photoURL);
+            await AsyncStorage.setItem(PROFILE_IMAGE_KEY, profileData.photoURL);
+            return;
+          }
+        } catch (firestoreError) {
+          console.log('Could not load from Firestore, trying cache:', firestoreError);
+        }
+
+        // Fallback to local storage
+        const savedImageUrl = await AsyncStorage.getItem(PROFILE_IMAGE_KEY);
+        if (savedImageUrl) {
+          setProfileImageUri(savedImageUrl);
+        } else if (user.photoURL) {
+          // Use Firebase Auth photo URL if available
+          setProfileImageUri(user.photoURL);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading profile image:', error);
+    }
+  };
+
+  const requestImagePickerPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'We need access to your photos to set a profile picture.'
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const handlePickImage = async () => {
+    if (!user) {
+      Alert.alert('Error', 'Please sign in to upload a profile picture.');
+      return;
+    }
+
+    const hasPermission = await requestImagePickerPermissions();
+    if (!hasPermission) return;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        // Update UI immediately (synchronous)
+        setProfileImageUri(imageUri);
+        // Upload in background (non-blocking)
+        uploadProfileImage(imageUri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const uploadProfileImage = async (imageUri: string) => {
+    if (!user || !auth.currentUser) {
+      Alert.alert('Error', 'Please sign in to upload a profile picture.');
+      // Revert image if not authenticated
+      setProfileImageUri(null);
+      return;
+    }
+
+    setUploadingImage(true);
+
+    // Upload to Firebase in the background (non-blocking)
+    (async () => {
+      try {
+        // Convert image URI to blob
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+
+        // Use fixed filename to replace old profile picture
+        // Path format: users/{userId}/profile.jpg (matches Firestore structure)
+        const filename = `users/${user.uid}/profile.jpg`;
+        const storageRef = ref(storage, filename);
+
+        // Upload to Firebase Storage
+        await uploadBytes(storageRef, blob);
+        const downloadURL = await getDownloadURL(storageRef);
+
+        // Save to AsyncStorage (cache)
+        await AsyncStorage.setItem(PROFILE_IMAGE_KEY, downloadURL);
+
+        // Save to Firestore (follows security rules)
+        await saveUserProfileToFirestore({ photoURL: downloadURL });
+
+        // Update Firebase Auth profile (optional, for consistency)
+        try {
+          await updateProfile(auth.currentUser, { photoURL: downloadURL });
+        } catch (authError) {
+          console.log('Could not update Auth profile, but Firestore saved:', authError);
+        }
+
+        // Update local state with the Firebase URL (replaces local URI)
+        setProfileImageUri(downloadURL);
+        
+        console.log('Profile picture uploaded successfully');
+      } catch (error: any) {
+        console.error('Error uploading profile image:', error);
+        console.error('Error details:', {
+          code: error?.code,
+          message: error?.message,
+          serverResponse: error?.serverResponse,
+        });
+        
+        // Revert to previous image if upload fails
+        try {
+          const previousImageUrl = await AsyncStorage.getItem(PROFILE_IMAGE_KEY);
+          if (previousImageUrl) {
+            setProfileImageUri(previousImageUrl);
+          } else if (user.photoURL) {
+            setProfileImageUri(user.photoURL);
+          } else {
+            setProfileImageUri(null);
+          }
+        } catch (revertError) {
+          console.error('Error reverting image:', revertError);
+          setProfileImageUri(null);
+        }
+        
+        let errorMessage = 'Failed to upload profile picture. Please try again.';
+        
+        if (error?.code === 'storage/unauthorized') {
+          errorMessage = 'Storage permission denied. Please check Firebase Storage security rules.';
+        } else if (error?.code === 'storage/quota-exceeded') {
+          errorMessage = 'Storage quota exceeded. Please check your Firebase plan.';
+        } else if (error?.code === 'storage/unauthenticated') {
+          errorMessage = 'Please sign in to upload a profile picture.';
+        } else if (error?.code === 'storage/unknown') {
+          errorMessage = 'Storage error. Please check:\n1. Firebase Storage is enabled\n2. Storage security rules allow uploads\n3. Storage bucket is configured correctly';
+        }
+        
+        Alert.alert('Upload Failed', errorMessage);
+      } finally {
+        setUploadingImage(false);
+      }
+    })();
   };
 
   // Auto-calculate calories from macros when they change
@@ -105,7 +397,22 @@ export default function ProfileScreen() {
     }
 
     try {
+      // Save to today's log (local cache)
       await setTodayTargetMacros(targets);
+      
+      // Save to Firestore user profile (if authenticated)
+      if (user) {
+        try {
+          await saveUserProfileToFirestore({ targetMacros: targets });
+          // Mark that user has saved targets
+          await AsyncStorage.setItem(HAS_SAVED_TARGETS_KEY, 'true');
+          setHasSavedTargets(true);
+        } catch (firestoreError) {
+          console.error('Error saving targets to Firestore:', firestoreError);
+          // Continue anyway - local save succeeded
+        }
+      }
+      
       setOriginalTargets(targets);
       setIsEditing(false);
       setEditingField(null);
@@ -133,8 +440,63 @@ export default function ProfileScreen() {
     setEditingField(null);
   };
 
-  const bmi = profile.weight && profile.height
-    ? (profile.weight / ((profile.height / 100) ** 2)).toFixed(1)
+  const loadPersonalInfo = async () => {
+    try {
+      if (user) {
+        // Try to load from Firestore first
+        try {
+          const profileData = await getUserProfileFromFirestore();
+          if (profileData) {
+            if (profileData.age !== undefined) setAge(profileData.age);
+            if (profileData.height !== undefined) setHeight(profileData.height);
+            if (profileData.weight !== undefined) setWeight(profileData.weight);
+            if (profileData.goal) setGoal(profileData.goal);
+            return;
+          }
+        } catch (firestoreError) {
+          console.log('Could not load personal info from Firestore:', firestoreError);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading personal info:', error);
+    }
+  };
+
+  const handleSavePersonalInfo = async () => {
+    if (!user) return;
+    
+    const profileData: any = {};
+    if (age !== null) profileData.age = age;
+    if (height !== null) profileData.height = height;
+    if (weight !== null) profileData.weight = weight;
+    if (goal) profileData.goal = goal;
+
+    // Save to Firestore in background
+    saveUserProfileToFirestore(profileData).catch((error) => {
+      console.error('Error saving personal info to Firestore:', error);
+    });
+  };
+
+  const handlePersonalFieldChange = (field: 'age' | 'height' | 'weight', value: number) => {
+    if (field === 'age') {
+      setAge(value);
+    } else if (field === 'height') {
+      setHeight(value);
+    } else if (field === 'weight') {
+      setWeight(value);
+    }
+    setEditingPersonalField(null);
+    handleSavePersonalInfo();
+  };
+
+  const handleGoalChange = (newGoal: 'lose' | 'maintain' | 'gain') => {
+    setGoal(newGoal);
+    setEditingPersonalField(null);
+    handleSavePersonalInfo();
+  };
+
+  const bmi = weight && height
+    ? (weight / ((height / 100) ** 2)).toFixed(1)
     : null;
 
   return (
@@ -143,11 +505,96 @@ export default function ProfileScreen() {
       contentContainerStyle={[styles.content, { paddingTop: insets.top }]}
     >
       <View style={styles.header}>
-        <View style={styles.profilePictureContainer}>
-          <Ionicons name="person" size={80} color="#666" />
-        </View>
-        <Text style={styles.name}>{profile.name}</Text>
-        <Text style={styles.email}>{profile.email}</Text>
+        <TouchableOpacity
+          style={styles.profilePictureContainer}
+          onPress={handlePickImage}
+          disabled={uploadingImage || !user}
+          activeOpacity={uploadingImage ? 1 : 0.7}
+        >
+          {profileImageUri ? (
+            <Image
+              source={{ uri: profileImageUri }}
+              style={styles.profileImage}
+              contentFit="cover"
+            />
+          ) : (
+            <Ionicons name="person" size={80} color="#666" />
+          )}
+        </TouchableOpacity>
+        {user ? (
+          <>
+            {isEditingDisplayName ? (
+              <View style={styles.displayNameEditContainer}>
+                <TextInput
+                  style={styles.displayNameInput}
+                  value={displayName}
+                  onChangeText={setDisplayName}
+                  placeholder="Enter display name"
+                  autoFocus
+                  maxLength={50}
+                />
+                <View style={styles.displayNameActions}>
+                  <TouchableOpacity
+                    style={styles.displayNameCancelButton}
+                    onPress={handleCancelDisplayName}
+                  >
+                    <Text style={styles.displayNameCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.displayNameSaveButton}
+                    onPress={handleSaveDisplayName}
+                  >
+                    <Text style={styles.displayNameSaveText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => setIsEditingDisplayName(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.name}>{displayName || 'Tap to set name'}</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  'Account',
+                  'Sign out of your account?',
+                  [
+                    {
+                      text: 'Cancel',
+                      style: 'cancel',
+                    },
+                    {
+                      text: 'Sign out',
+                      style: 'destructive',
+                      onPress: () => signOut(),
+                    },
+                  ]
+                );
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.email}>
+                {user.phoneNumber || user.email || user.uid}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.name}>{profile.name}</Text>
+            <Text style={styles.email}>{profile.email}</Text>
+            <TouchableOpacity
+              style={styles.phoneAuthButton}
+              onPress={() => navigation.getParent()?.navigate('PhoneAuth' as never)}
+              disabled={authLoading}
+            >
+              <Ionicons name="call" size={20} color="#fff" />
+              <Text style={styles.phoneAuthButtonText}>Sign in with phone</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -312,44 +759,121 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Personal Information</Text>
-        {profile.age && (
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Age:</Text>
-            <Text style={styles.infoValue}>{profile.age} years</Text>
+        
+        <TouchableOpacity
+          style={styles.infoRow}
+          onPress={() => setEditingPersonalField('age')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.infoLabel}>Age:</Text>
+          <View style={styles.infoValueRow}>
+            <Text style={styles.infoValue}>{age !== null ? `${age} years` : 'Tap to set'}</Text>
+            <Ionicons name="chevron-forward" size={18} color="#007AFF" />
           </View>
-        )}
-        {profile.height && (
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Height:</Text>
-            <Text style={styles.infoValue}>{profile.height} cm</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.infoRow}
+          onPress={() => setEditingPersonalField('height')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.infoLabel}>Height:</Text>
+          <View style={styles.infoValueRow}>
+            <Text style={styles.infoValue}>{height !== null ? `${height} cm` : 'Tap to set'}</Text>
+            <Ionicons name="chevron-forward" size={18} color="#007AFF" />
           </View>
-        )}
-        {profile.weight && (
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Weight:</Text>
-            <Text style={styles.infoValue}>{profile.weight} kg</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.infoRow}
+          onPress={() => setEditingPersonalField('weight')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.infoLabel}>Weight:</Text>
+          <View style={styles.infoValueRow}>
+            <Text style={styles.infoValue}>{weight !== null ? `${weight} kg` : 'Tap to set'}</Text>
+            <Ionicons name="chevron-forward" size={18} color="#007AFF" />
           </View>
-        )}
+        </TouchableOpacity>
+
         {bmi && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>BMI:</Text>
             <Text style={styles.infoValue}>{bmi}</Text>
           </View>
         )}
-        {profile.activityLevel && (
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Activity Level:</Text>
+
+        <TouchableOpacity
+          style={styles.infoRow}
+          onPress={() => setEditingPersonalField('goal')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.infoLabel}>Goal:</Text>
+          <View style={styles.infoValueRow}>
             <Text style={styles.infoValue}>
-              {profile.activityLevel.charAt(0).toUpperCase() + profile.activityLevel.slice(1)}
+              {goal 
+                ? `${goal.charAt(0).toUpperCase() + goal.slice(1)} weight`
+                : 'Tap to set'}
             </Text>
+            <Ionicons name="chevron-forward" size={18} color="#007AFF" />
           </View>
-        )}
-        {profile.goal && (
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Goal:</Text>
-            <Text style={styles.infoValue}>
-              {profile.goal.charAt(0).toUpperCase() + profile.goal.slice(1)} weight
-            </Text>
+        </TouchableOpacity>
+
+        <NumberEditor
+          visible={editingPersonalField === 'age'}
+          value={age || 0}
+          onSave={(v) => handlePersonalFieldChange('age', v)}
+          onCancel={() => setEditingPersonalField(null)}
+          min={1}
+          max={150}
+          title="Age"
+          unit="years"
+        />
+
+        <NumberEditor
+          visible={editingPersonalField === 'height'}
+          value={height || 0}
+          onSave={(v) => handlePersonalFieldChange('height', v)}
+          onCancel={() => setEditingPersonalField(null)}
+          min={50}
+          max={300}
+          title="Height"
+          unit="cm"
+        />
+
+        <NumberEditor
+          visible={editingPersonalField === 'weight'}
+          value={weight || 0}
+          onSave={(v) => handlePersonalFieldChange('weight', v)}
+          onCancel={() => setEditingPersonalField(null)}
+          min={20}
+          max={500}
+          title="Weight"
+          unit="kg"
+        />
+
+        {editingPersonalField === 'goal' && (
+          <View style={styles.pickerModal}>
+            <View style={styles.pickerContainer}>
+              <View style={styles.pickerHeader}>
+                <Text style={styles.pickerTitle}>Goal</Text>
+                <TouchableOpacity
+                  onPress={() => setEditingPersonalField(null)}
+                  style={styles.pickerCloseButton}
+                >
+                  <Text style={styles.pickerCloseText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <Picker
+                selectedValue={goal || 'maintain'}
+                onValueChange={handleGoalChange}
+                style={styles.picker}
+              >
+                <Picker.Item label="Lose Weight" value="lose" />
+                <Picker.Item label="Maintain Weight" value="maintain" />
+                <Picker.Item label="Gain Weight" value="gain" />
+              </Picker>
+            </View>
           </View>
         )}
       </View>
@@ -372,6 +896,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
+  phoneAuthButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  phoneAuthButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   profilePictureContainer: {
     width: 120,
     height: 120,
@@ -382,6 +922,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 3,
     borderColor: '#e0e0e0',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontSize: 28,
@@ -454,6 +1000,51 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  infoValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pickerModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    zIndex: 1000,
+  },
+  pickerContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  pickerCloseButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  pickerCloseText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  picker: {
+    height: 200,
   },
   macroRow: {
     flexDirection: 'row',
@@ -554,6 +1145,51 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: '600',
+  },
+  displayNameEditContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  displayNameInput: {
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 22,
+    fontWeight: '600',
+    textAlign: 'center',
+    width: '100%',
+    maxWidth: 300,
+    backgroundColor: '#fff',
+    marginBottom: 12,
+  },
+  displayNameActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  displayNameCancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  displayNameCancelText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  displayNameSaveButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+  },
+  displayNameSaveText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

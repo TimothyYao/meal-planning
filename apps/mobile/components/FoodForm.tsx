@@ -53,6 +53,7 @@ interface FoodFormProps {
 
 export interface FoodFormRef {
   save: () => Promise<void>;
+  isSaving: () => boolean;
 }
 
 const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
@@ -104,6 +105,7 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
   const [lastSavedProtein, setLastSavedProtein] = useState<number | null>(null);
   const [lastSavedCarbs, setLastSavedCarbs] = useState<number | null>(null);
   const [lastSavedFat, setLastSavedFat] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadLastValues();
@@ -111,6 +113,7 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
 
   useImperativeHandle(ref, () => ({
     save: handleSave,
+    isSaving: () => isSaving,
   }));
 
   const loadLastValues = async () => {
@@ -152,6 +155,10 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
     : '0';
 
   const handleSave = async () => {
+    if (isSaving) {
+      return; // Prevent multiple saves
+    }
+
     if (!foodName.trim()) {
       if (onValidationError) {
         onValidationError('Please enter a food name');
@@ -191,7 +198,12 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
       }
     }
 
-    await proceedWithSave(macros);
+    setIsSaving(true);
+    try {
+      await proceedWithSave(macros);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const proceedWithSave = async (macros: MacroTargets) => {
@@ -370,8 +382,14 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
       </View>
 
       {!hideSaveButton && (
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>{buttonText}</Text>
+        <TouchableOpacity 
+          style={[styles.saveButton, isSaving && styles.saveButtonDisabled]} 
+          onPress={handleSave}
+          disabled={isSaving}
+        >
+          <Text style={styles.saveButtonText}>
+            {isSaving ? 'Saving...' : buttonText}
+          </Text>
         </TouchableOpacity>
       )}
 
@@ -641,6 +659,9 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginTop: 20,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
   },
   saveButtonText: {
     color: '#fff',

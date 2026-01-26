@@ -1,10 +1,11 @@
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { FoodItem, formatMacroValue } from '@meal-planning/shared';
-import { saveFood, addFoodToToday, generateFoodId, getFoodById } from '../utils/storage';
+import { saveFood, addFoodToDate, generateFoodId, getFoodById, getTodayDate } from '../utils/storage';
+import { safeGoBack } from '../utils/navigation';
 
 type FoodDetailRouteParams = {
   foodId: string;
@@ -25,6 +26,7 @@ export default function FoodDetailScreen() {
   const [food, setFood] = useState<FoodItem | null>(null);
   const [quantity] = useState(initialQuantity);
   const [loading, setLoading] = useState(true);
+  const [isCopying, setIsCopying] = useState(false);
   const addedAt = addedAtString ? new Date(addedAtString) : undefined;
 
   // Load food data when screen comes into focus
@@ -52,7 +54,10 @@ export default function FoodDetailScreen() {
     return unit ? `${sizeText} ${unit}` : sizeText;
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (date: Date | undefined) => {
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+      return '';
+    }
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
@@ -88,36 +93,49 @@ export default function FoodDetailScreen() {
   };
 
   const handleDuplicate = async () => {
-    if (!food) return;
+    if (!food || isCopying) return;
+    
+    setIsCopying(true);
     try {
+      console.log('Starting copy operation for food:', food.name);
+      
       // Create a copy of the food item with a new UUID
+      const newId = await generateFoodId();
       const copiedFood: FoodItem = {
         ...food,
-        id: await generateFoodId(),
+        id: newId,
       };
+      
+      console.log('Created copied food with new ID:', newId);
 
-      // Save the copied food to the database
+      // Save the copied food to the database (cache first, then Firebase)
       await saveFood(copiedFood);
+      console.log('Saved copied food to cache');
 
-      // Add to today's log with the same quantity
-      await addFoodToToday(copiedFood, quantity);
+      // Add to the date's log (use the date from route params, or today if not available)
+      const targetDate = date || getTodayDate();
+      await addFoodToDate(copiedFood, quantity, targetDate);
+      console.log(`Added copied food to ${targetDate}'s log`);
 
       Alert.alert('Success', `Copied ${food.name} and added to today's log`, [
         {
           text: 'OK',
           onPress: () => {
-            navigation.goBack();
+            safeGoBack(navigation);
           },
         },
       ]);
     } catch (error) {
       console.error('Error copying food:', error);
-      Alert.alert('Error', 'Failed to copy food. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', `Failed to copy food: ${errorMessage}`);
+    } finally {
+      setIsCopying(false);
     }
   };
 
   const handleBack = () => {
-    navigation.goBack();
+    safeGoBack(navigation);
   };
 
   if (loading || !food) {
@@ -253,11 +271,23 @@ export default function FoodDetailScreen() {
           <Text style={styles.tileText}>Edit</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navTile} onPress={handleDuplicate} activeOpacity={0.7}>
+        <TouchableOpacity 
+          style={[styles.navTile, (isCopying || !food) && styles.navTileDisabled]} 
+          onPress={() => {
+            console.log('Copy button pressed, food:', food?.name, 'isCopying:', isCopying);
+            handleDuplicate();
+          }} 
+          activeOpacity={0.7}
+          disabled={isCopying || !food}
+        >
           <View style={styles.tileIconContainer}>
-            <Ionicons name="copy" size={24} color="#007AFF" />
+            {isCopying ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+              <Ionicons name="copy" size={24} color="#007AFF" />
+            )}
           </View>
-          <Text style={styles.tileText}>Copy</Text>
+          <Text style={styles.tileText}>{isCopying ? 'Copying...' : 'Copy'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.navTile} onPress={handleBack} activeOpacity={0.7}>
@@ -374,6 +404,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 12,
     minHeight: 80,
+  },
+  navTileDisabled: {
+    opacity: 0.6,
   },
   tileIconContainer: {
     marginBottom: 8,
