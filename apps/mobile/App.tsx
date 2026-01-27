@@ -24,6 +24,7 @@ import PhoneAuthScreen from './screens/PhoneAuthScreen';
 import FoodDetailScreen from './screens/FoodDetailScreen';
 import EditFoodScreen from './screens/EditFoodScreen';
 import SearchFoodScreen from './screens/SearchFoodScreen';
+import RecipeBuilderScreen from './screens/RecipeBuilderScreen';
 import FloatingAddMenu from './components/FloatingAddMenu';
 
 const Tab = createBottomTabNavigator();
@@ -103,6 +104,17 @@ function TabNavigator() {
         }}
       />
       <Tab.Screen
+        name="Recipes"
+        component={RecipeBuilderScreen}
+        options={{
+          title: 'Recipes',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="restaurant" size={24} color={color} />
+          ),
+          headerShown: false,
+        }}
+      />
+      <Tab.Screen
         name="AddFoodTab"
         component={HomeStack}
         options={{
@@ -156,6 +168,7 @@ const linking = {
               },
             },
           },
+          Recipes: 'recipes',
           AddFoodTab: 'add-food',
           Profile: 'profile',
         },
@@ -184,6 +197,13 @@ export default function App() {
     hideFloatingAddMenu();
     if (navigationRef.current) {
       navigationRef.current.navigate('SearchFood' as never);
+    }
+  };
+
+  const handleCreateRecipe = () => {
+    hideFloatingAddMenu();
+    if (navigationRef.current) {
+      navigationRef.current.navigate('MainTabs' as never, { screen: 'Recipes' } as never);
     }
   };
 
@@ -234,6 +254,7 @@ export default function App() {
             onClose={() => setFloatingMenuVisibleState(false)}
             onCustomFood={handleCustomFood}
             onSearch={handleSearch}
+            onCreateRecipe={handleCreateRecipe}
           />
         </SafeAreaProvider>
       </GestureHandlerRootView>
