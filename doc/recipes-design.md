@@ -69,7 +69,7 @@ erDiagram
         number fat
         number servingSize
         string servingUnit
-        string category
+        string[] tags
         string source
         Timestamp createdAt
         Timestamp updatedAt
@@ -92,15 +92,10 @@ erDiagram
     
     RecipeIngredient {
         string foodId FK
-        string foodName
+        FoodItem food
         number quantity
-        number servingSize
-        string servingUnit
-        number calories
-        number protein
-        number carbs
-        number fat
         string notes
+        Timestamp addedAt
     }
     
     DailyLog {
@@ -161,9 +156,10 @@ flowchart LR
 ```
 
 **Recipe Ingredient Storage Strategy:**
-- Store essential food data (name, macros, serving info) directly in recipe ingredients
-- Store `foodId` reference for updates/linking
+- Embed the full `FoodItem` snapshot in each ingredient (mirrors `MealFood` pattern)
+- Store `foodId` reference for updates/linking back to original
 - Avoids N+1 reads when loading recipes
+- Consistent structure between `RecipeIngredient` and `MealFood`
 
 ### 2. Embedded vs. Subcollection Decision
 
@@ -201,7 +197,7 @@ flowchart TB
         
         subgraph Composite["Composite (Manual)"]
             C1["recipes: tags (array-contains) + createdAt DESC"]
-            C2["foods: category + name ASC"]
+            C2["foods: tags (array-contains) + name ASC"]
         end
     end
 ```
@@ -523,15 +519,15 @@ sequenceDiagram
 ```mermaid
 flowchart TB
     subgraph RecipeDoc["Recipe Document"]
-        Meta["id: 'abc123'<br/>name: 'Chicken Stir Fry'<br/>servings: 4<br/>tags: ['high-protein']"]
+        Meta["id: 'abc123'<br/>name: 'Chicken Stir Fry'<br/>servings: 4<br/>tags: ['high-protein', 'dinner']"]
         
         subgraph Macros["macros (per serving)"]
             M["calories: 350<br/>protein: 35<br/>carbs: 25<br/>fat: 12"]
         end
         
-        subgraph Ingredients["ingredients[] (embedded)"]
-            Ing1["[0] foodId: 'f1'<br/>foodName: 'Chicken'<br/>quantity: 2<br/>calories: 330<br/>protein: 62g..."]
-            Ing2["[1] foodId: 'f2'<br/>foodName: 'Rice'<br/>quantity: 1.5<br/>calories: 180<br/>protein: 6g..."]
+        subgraph Ingredients["ingredients[] (embedded FoodItem)"]
+            Ing1["[0] foodId: 'f1'<br/>food: {name: 'Chicken', ...}<br/>quantity: 2<br/>notes: 'diced'"]
+            Ing2["[1] foodId: 'f2'<br/>food: {name: 'Rice', ...}<br/>quantity: 1.5"]
         end
         
         Times["createdAt: Timestamp<br/>updatedAt: Timestamp"]
@@ -840,21 +836,10 @@ class RecipeRepository implements Repository<Recipe> {
       fat: recipe.macros.fat * servings,
     };
     
-    // Convert ingredients to meal foods
+    // Convert RecipeIngredients to MealFoods (same structure)
     const foods: MealFood[] = recipe.ingredients.map(ing => ({
       foodId: ing.foodId,
-      food: {
-        id: ing.foodId,
-        name: ing.foodName,
-        macros: {
-          calories: ing.calories,
-          protein: ing.protein,
-          carbs: ing.carbs,
-          fat: ing.fat,
-        },
-        servingSize: ing.servingSize,
-        servingUnit: ing.servingUnit,
-      },
+      food: ing.food,  // Already embedded FoodItem
       quantity: ing.quantity * servings,
       addedAt: new Date(),
     }));
