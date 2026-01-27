@@ -52,9 +52,14 @@ Food database entries with nutritional information.
 - `macros`: MacroTargets (per serving)
 - `servingSize`: number (in grams)
 - `servingUnit`: string (e.g., "g", "ml", "piece", "cup")
-- `category`: string (optional, e.g., "protein", "vegetable", "grain")
+- `tags`: string[] (optional, e.g., ["protein", "meat", "poultry", "aisle:meat"])
 - `imageUrl`: string (optional)
 - `source`: string (optional, e.g., "USDA", "OpenFoodFacts", "user")
+
+**Tag Conventions:**
+- Food type tags: `protein`, `vegetable`, `grain`, `dairy`, `fruit`
+- Shopping aisle tags: `aisle:produce`, `aisle:meat`, `aisle:dairy`, `aisle:frozen`
+- Dietary tags: `vegan`, `vegetarian`, `gluten-free`, `keto`
 
 **Relationships:**
 - Used in many Meals (via MealFood)
@@ -128,8 +133,7 @@ Saved recipes with ingredients that can be reused.
 - `prepTime`: number (optional, in minutes)
 - `cookTime`: number (optional, in minutes)
 - `imageUrl`: string (optional)
-- `category`: string (optional, e.g., "breakfast", "dinner", "snack")
-- `tags`: string[] (optional, e.g., ["vegan", "high-protein", "meal-prep"])
+- `tags`: string[] (optional, e.g., ["breakfast", "dinner", "vegan", "high-protein", "meal-prep"])
 - `isPublic`: boolean (default: false)
 - `createdBy`: string (user ID)
 - `createdAt`: Date
@@ -143,13 +147,16 @@ Saved recipes with ingredients that can be reused.
 ---
 
 ### RecipeIngredient
-An ingredient within a recipe.
+An ingredient within a recipe. Structure mirrors MealFood for consistency.
 
 **Fields:**
 - `foodId`: string (reference to FoodItem)
-- `food`: FoodItem (populated reference)
+- `food`: FoodItem (embedded snapshot for denormalization)
 - `quantity`: number (multiplier of servingSize)
 - `notes`: string (optional, e.g., "chopped", "diced")
+- `addedAt`: Date (optional)
+
+**Note:** The `food` field embeds a snapshot of the FoodItem data at the time the ingredient was added. This denormalization avoids N+1 reads when loading recipes in Firestore.
 
 ---
 
