@@ -86,12 +86,16 @@ A collection of foods consumed at a specific time.
 ---
 
 ### MealFood
-A food item within a meal with specific quantity.
+A food item within a meal with specific quantity. Each entry has a unique ID to support reordering and reliable identification.
 
 **Fields:**
+- `id`: string (unique identifier for this log entry)
 - `foodId`: string (reference to FoodItem)
-- `food`: FoodItem (populated reference)
+- `food`: FoodItem (embedded snapshot for denormalization)
 - `quantity`: number (multiplier of servingSize)
+- `addedAt`: Date (optional, timestamp when food was added to the meal)
+
+**Note:** The `id` field uniquely identifies each log entry, allowing the same food to appear multiple times in a meal (e.g., duplicates) while maintaining distinct identities for reordering and deletion. The `food` field embeds a snapshot of the FoodItem data, similar to RecipeIngredient.
 
 **Calculations:**
 - Actual macros = food.macros × quantity
