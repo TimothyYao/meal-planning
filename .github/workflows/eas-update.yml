@@ -20,12 +20,27 @@ jobs:
           node-version: 20.x
           cache: 'npm'
 
+      - name: Restore node_modules cache
+        id: node-modules-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Run tests
         working-directory: ./apps/mobile
         run: npm test
+
+      - name: Save node_modules cache
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
   update-production:
     name: EAS Update (Production)
@@ -71,14 +86,33 @@ jobs:
           node-version: 20.x
           cache: 'npm'
 
+      - name: Restore node_modules cache
+        id: node-modules-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Restore Expo and EAS caches
+        id: expo-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.expo
+            ~/.eas
+            ~/.cache/expo
+            ~/.cache/metro
+          key: expo-eas-${{ runner.os }}-${{ hashFiles('package-lock.json', 'apps/mobile/package.json') }}
+
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Create update
         working-directory: ./apps/mobile
@@ -91,6 +125,17 @@ jobs:
           EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
+
+      - name: Save Expo and EAS caches
+        if: steps.expo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.expo
+            ~/.eas
+            ~/.cache/expo
+            ~/.cache/metro
+          key: expo-eas-${{ runner.os }}-${{ hashFiles('package-lock.json', 'apps/mobile/package.json') }}
 
   update-preview:
     name: EAS Update (Preview)
@@ -136,14 +181,33 @@ jobs:
           node-version: 20.x
           cache: 'npm'
 
+      - name: Restore node_modules cache
+        id: node-modules-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Restore Expo and EAS caches
+        id: expo-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.expo
+            ~/.eas
+            ~/.cache/expo
+            ~/.cache/metro
+          key: expo-eas-${{ runner.os }}-${{ hashFiles('package-lock.json', 'apps/mobile/package.json') }}
+
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Create preview update
         working-directory: ./apps/mobile
@@ -156,3 +220,14 @@ jobs:
           EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
+
+      - name: Save Expo and EAS caches
+        if: steps.expo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.expo
+            ~/.eas
+            ~/.cache/expo
+            ~/.cache/metro
+          key: expo-eas-${{ runner.os }}-${{ hashFiles('package-lock.json', 'apps/mobile/package.json') }}
