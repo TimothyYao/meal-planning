@@ -32,6 +32,7 @@ export interface Meal {
 }
 
 export interface MealFood {
+  id: string; // unique identifier for this log entry
   foodId: string;
   food: FoodItem;
   quantity: number; // multiplier of servingSize

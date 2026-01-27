@@ -116,22 +116,14 @@ export default function HomeScreen() {
             try {
               const dateString = formatDateString(selectedDate);
               
-              // Find the current index of this item in the meal
-              // We need to match by addedAt timestamp since that's unique per entry
+              // Find the current index of this item in the meal by its unique ID
               const meal = selectedDateLog?.meals.find(m => m.id === mealId);
               if (!meal) {
                 console.error('Meal not found');
                 return;
               }
               
-              const currentIndex = meal.foods.findIndex(f => {
-                // Match by addedAt timestamp if available
-                if (mealFood.addedAt && f.addedAt) {
-                  return f.addedAt.getTime() === mealFood.addedAt.getTime();
-                }
-                // Fallback: match by foodId and quantity (less reliable for duplicates)
-                return f.foodId === mealFood.foodId && f.quantity === mealFood.quantity;
-              });
+              const currentIndex = meal.foods.findIndex(f => f.id === mealFood.id);
               
               if (currentIndex === -1) {
                 console.error('Food not found in meal');
@@ -254,34 +246,23 @@ export default function HomeScreen() {
     if (!selectedDateLog || selectedDateLog.meals.length === 0) return [];
     
     return selectedDateLog.meals.flatMap(meal =>
-      meal.foods.map((mealFood, index) => {
-        // Use addedAt timestamp for unique key if available, otherwise fall back to index
-        // This ensures duplicated foods have unique keys
-        const uniqueId = mealFood.addedAt 
-          ? mealFood.addedAt.getTime().toString() 
-          : `${index}-${Date.now()}`;
-        return {
-          mealFood,
-          mealId: meal.id,
-          index,
-          key: `${meal.id}-${uniqueId}`,
-        };
-      })
+      meal.foods.map((mealFood, index) => ({
+        mealFood,
+        mealId: meal.id,
+        index,
+        // Use the mealFood's unique ID for the key
+        key: mealFood.id || `${meal.id}-${index}`,
+      }))
     );
   }, [selectedDateLog]);
 
   const handleItemPress = useCallback((item: { mealFood: MealFood; mealId: string; index: number }) => {
-    // Find the current index of this item in the meal
+    // Find the current index of this item in the meal by its unique ID
     const meal = selectedDateLog?.meals.find(m => m.id === item.mealId);
     let currentIndex = item.index;
     
-    if (meal) {
-      const foundIndex = meal.foods.findIndex(f => {
-        if (item.mealFood.addedAt && f.addedAt) {
-          return f.addedAt.getTime() === item.mealFood.addedAt.getTime();
-        }
-        return f.foodId === item.mealFood.foodId && f.quantity === item.mealFood.quantity;
-      });
+    if (meal && item.mealFood.id) {
+      const foundIndex = meal.foods.findIndex(f => f.id === item.mealFood.id);
       if (foundIndex !== -1) {
         currentIndex = foundIndex;
       }
