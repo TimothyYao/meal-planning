@@ -84,12 +84,8 @@ erDiagram
         number protein
         number carbs
         number fat
-        number prepTime
-        number cookTime
-        string category
         string[] tags
         RecipeIngredient[] ingredients
-        string[] instructions
         Timestamp createdAt
         Timestamp updatedAt
     }
@@ -198,16 +194,14 @@ flowchart TB
     subgraph Indexes["Firestore Indexes"]
         subgraph Single["Single-Field (Automatic)"]
             I1["recipes.name"]
-            I2["recipes.category"]
-            I3["recipes.createdAt"]
-            I4["foods.name"]
-            I5["foods.barcode"]
+            I2["recipes.createdAt"]
+            I3["foods.name"]
+            I4["foods.barcode"]
         end
         
         subgraph Composite["Composite (Manual)"]
-            C1["recipes: category + createdAt DESC"]
-            C2["recipes: tags (array-contains) + createdAt DESC"]
-            C3["foods: category + name ASC"]
+            C1["recipes: tags (array-contains) + createdAt DESC"]
+            C2["foods: category + name ASC"]
         end
     end
 ```
@@ -273,8 +267,8 @@ classDiagram
     }
     
     class RecipeRepository {
-        +getByCategory(category: string) Promise~Recipe[]~
         +getByTags(tags: string[]) Promise~Recipe[]~
+        +search(query: string) Promise~Recipe[]~
         +duplicate(recipeId: string) Promise~Recipe~
         +calculateMacros(ingredients: RecipeIngredient[]) MacroTargets
     }
@@ -445,11 +439,10 @@ flowchart TB
         Start["New Recipe"] --> Name["Enter Name"]
         Name --> Desc["Description (optional)"]
         Desc --> Servings["Set Servings"]
-        Servings --> Category["Select Category"]
     end
     
     subgraph Phase2["2. Add Ingredients"]
-        Category --> SearchFood["Search Foods"]
+        Servings --> SearchFood["Search Foods"]
         SearchFood --> SelectFood["Select Food"]
         SelectFood --> SetQty["Set Quantity"]
         SetQty --> Notes["Add Notes (optional)"]
@@ -460,8 +453,7 @@ flowchart TB
     
     subgraph Phase3["3. Finalize"]
         Preview["Preview Macros/Serving"]
-        Preview --> Instructions["Add Instructions (optional)"]
-        Instructions --> Tags["Add Tags (optional)"]
+        Preview --> Tags["Add Tags (optional)"]
         Tags --> Save["Save Recipe"]
     end
 ```
@@ -531,7 +523,7 @@ sequenceDiagram
 ```mermaid
 flowchart TB
     subgraph RecipeDoc["Recipe Document"]
-        Meta["id: 'abc123'<br/>name: 'Chicken Stir Fry'<br/>servings: 4<br/>category: 'dinner'"]
+        Meta["id: 'abc123'<br/>name: 'Chicken Stir Fry'<br/>servings: 4<br/>tags: ['high-protein']"]
         
         subgraph Macros["macros (per serving)"]
             M["calories: 350<br/>protein: 35<br/>carbs: 25<br/>fat: 12"]
@@ -542,7 +534,7 @@ flowchart TB
             Ing2["[1] foodId: 'f2'<br/>foodName: 'Rice'<br/>quantity: 1.5<br/>calories: 180<br/>protein: 6g..."]
         end
         
-        Times["prepTime: 15<br/>cookTime: 20<br/>createdAt: Timestamp<br/>updatedAt: Timestamp"]
+        Times["createdAt: Timestamp<br/>updatedAt: Timestamp"]
     end
 ```
 
