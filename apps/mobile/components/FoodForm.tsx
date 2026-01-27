@@ -1,4 +1,4 @@
-import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useState, useEffect, useImperativeHandle, forwardRef, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -74,6 +74,7 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
   const [protein, setProtein] = useState(initialFood?.macros.protein.toString() || '');
   const [carbs, setCarbs] = useState(initialFood?.macros.carbs.toString() || '');
   const [fat, setFat] = useState(initialFood?.macros.fat.toString() || '');
+  const foodNameInputRef = useRef<TextInput>(null);
   const [selectedServingId, setSelectedServingId] = useState(() => {
     if (initialFood) {
       // Normalize values for comparison - trim whitespace and ensure consistent types
@@ -112,6 +113,7 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
   const [lastSavedCarbs, setLastSavedCarbs] = useState<number | null>(null);
   const [lastSavedFat, setLastSavedFat] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const shouldAutoFocusName = !initialFood;
 
   useEffect(() => {
     loadLastValues();
@@ -119,6 +121,16 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
       loadLastDate();
     }
   }, []);
+
+  useEffect(() => {
+    if (!shouldAutoFocusName) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      foodNameInputRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [shouldAutoFocusName]);
 
   useImperativeHandle(ref, () => ({
     save: handleSave,
@@ -339,10 +351,12 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
       <View style={styles.section}>
         <Text style={styles.label}>Food Name *</Text>
         <TextInput
+          ref={foodNameInputRef}
           style={styles.input}
           placeholder="e.g., Chicken Breast"
           value={foodName}
           onChangeText={setFoodName}
+          autoFocus={shouldAutoFocusName}
         />
       </View>
 
