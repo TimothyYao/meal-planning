@@ -1,4 +1,4 @@
-import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useState, useEffect, useImperativeHandle, forwardRef, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,24 +6,19 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Modal,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FoodItem, MacroTargets, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
-import { 
-  getLastProtein, 
+import {
   saveLastProtein,
-  getLastCarbs,
   saveLastCarbs,
-  getLastFat,
   saveLastFat,
   getLastDate,
   saveLastDate,
   generateFoodId,
 } from '../storage';
 import { ServingOption, ServingSizePicker } from './ServingSizePicker';
-import { MacroAmountPicker } from './MacroAmountPicker';
 import { NumberEditor } from './NumberEditor';
 import CalendarPicker from './CalendarPicker';
 
@@ -98,23 +93,33 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [isLoadingLastDate, setIsLoadingLastDate] = useState(!initialDate && showDate);
   const [servingPickerExpanded, setServingPickerExpanded] = useState(false);
-  const [showProteinPicker, setShowProteinPicker] = useState(false);
-  const [showCarbsPicker, setShowCarbsPicker] = useState(false);
-  const [showFatPicker, setShowFatPicker] = useState(false);
   const [showQuantityEditor, setShowQuantityEditor] = useState(false);
-  const [showProteinEditor, setShowProteinEditor] = useState(false);
-  const [showCarbsEditor, setShowCarbsEditor] = useState(false);
-  const [showFatEditor, setShowFatEditor] = useState(false);
-  const [tempProteinValue, setTempProteinValue] = useState(0);
-  const [tempCarbsValue, setTempCarbsValue] = useState(0);
-  const [tempFatValue, setTempFatValue] = useState(0);
-  const [lastSavedProtein, setLastSavedProtein] = useState<number | null>(null);
-  const [lastSavedCarbs, setLastSavedCarbs] = useState<number | null>(null);
-  const [lastSavedFat, setLastSavedFat] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const nameInputRef = useRef<TextInput>(null);
+  const proteinInputRef = useRef<TextInput>(null);
+  const carbsInputRef = useRef<TextInput>(null);
+  const fatInputRef = useRef<TextInput>(null);
+
+  const handleArrowNavigation = (
+    key: string,
+    previousRef?: { current: TextInput | null },
+    nextRef?: { current: TextInput | null }
+  ) => {
+    if (!key) {
+      return;
+    }
+    const normalizedKey = key.toLowerCase();
+    if (normalizedKey === 'arrowup' || normalizedKey === 'up') {
+      previousRef?.current?.focus();
+      return;
+    }
+    if (normalizedKey === 'arrowdown' || normalizedKey === 'down') {
+      nextRef?.current?.focus();
+    }
+  };
+
   useEffect(() => {
-    loadLastValues();
     if (!initialDate && showDate) {
       loadLastDate();
     }
@@ -124,17 +129,6 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
     save: handleSave,
     isSaving: () => isSaving,
   }));
-
-  const loadLastValues = async () => {
-    const [lastProtein, lastCarbs, lastFat] = await Promise.all([
-      getLastProtein(),
-      getLastCarbs(),
-      getLastFat(),
-    ]);
-    setLastSavedProtein(lastProtein);
-    setLastSavedCarbs(lastCarbs);
-    setLastSavedFat(lastFat);
-  };
 
   const loadLastDate = async () => {
     try {
@@ -147,21 +141,6 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
     } finally {
       setIsLoadingLastDate(false);
     }
-  };
-
-  const loadLastProtein = async () => {
-    const lastProtein = await getLastProtein();
-    setLastSavedProtein(lastProtein);
-  };
-
-  const loadLastCarbs = async () => {
-    const lastCarbs = await getLastCarbs();
-    setLastSavedCarbs(lastCarbs);
-  };
-
-  const loadLastFat = async () => {
-    const lastFat = await getLastFat();
-    setLastSavedFat(lastFat);
   };
 
   const calculateCaloriesFromMacros = (proteinValue: number, carbsValue: number, fatValue: number) => {
@@ -258,6 +237,11 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
     }
     
     await onSave(foodItem, qty, dateToUse);
+    await Promise.all([
+      saveLastProtein(proteinValue),
+      saveLastCarbs(carbsValue),
+      saveLastFat(fatValue),
+    ]);
   };
 
   const isToday = (date: Date): boolean => {
@@ -339,10 +323,17 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
       <View style={styles.section}>
         <Text style={styles.label}>Food Name *</Text>
         <TextInput
+          ref={nameInputRef}
           style={styles.input}
           placeholder="e.g., Chicken Breast"
           value={foodName}
           onChangeText={setFoodName}
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => proteinInputRef.current?.focus()}
+          onKeyPress={({ nativeEvent }) =>
+            handleArrowNavigation(nativeEvent.key, undefined, proteinInputRef)
+          }
         />
       </View>
 
@@ -356,86 +347,54 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
 
         <View style={styles.macroRow}>
           <Text style={styles.macroLabel}>Protein (g)</Text>
-          <View style={styles.macroInputContainer}>
-            <TouchableOpacity
-              style={styles.inputButton}
-              onPress={async () => {
-                const currentValue = parseFloat(protein) || 0;
-                setTempProteinValue(currentValue);
-                await loadLastProtein();
-                setShowProteinPicker(true);
-              }}
-            >
-              <Text style={[styles.input, styles.inputButtonText]}>
-                {protein || '0'}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color="#999" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.penIconButton}
-              onPress={() => {
-                setShowProteinEditor(true);
-              }}
-            >
-              <Ionicons name="create-outline" size={18} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
+          <TextInput
+            ref={proteinInputRef}
+            style={[styles.input, styles.macroInput]}
+            value={protein}
+            onChangeText={setProtein}
+            placeholder="0"
+            keyboardType="numeric"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => carbsInputRef.current?.focus()}
+            onKeyPress={({ nativeEvent }) =>
+              handleArrowNavigation(nativeEvent.key, nameInputRef, carbsInputRef)
+            }
+          />
         </View>
 
         <View style={styles.macroRow}>
           <Text style={styles.macroLabel}>Carbs (g)</Text>
-          <View style={styles.macroInputContainer}>
-            <TouchableOpacity
-              style={styles.inputButton}
-              onPress={async () => {
-                const currentValue = parseFloat(carbs) || 0;
-                setTempCarbsValue(currentValue);
-                await loadLastCarbs();
-                setShowCarbsPicker(true);
-              }}
-            >
-              <Text style={[styles.input, styles.inputButtonText]}>
-                {carbs || '0'}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color="#999" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.penIconButton}
-              onPress={() => {
-                setShowCarbsEditor(true);
-              }}
-            >
-              <Ionicons name="create-outline" size={18} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
+          <TextInput
+            ref={carbsInputRef}
+            style={[styles.input, styles.macroInput]}
+            value={carbs}
+            onChangeText={setCarbs}
+            placeholder="0"
+            keyboardType="numeric"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => fatInputRef.current?.focus()}
+            onKeyPress={({ nativeEvent }) =>
+              handleArrowNavigation(nativeEvent.key, proteinInputRef, fatInputRef)
+            }
+          />
         </View>
 
         <View style={styles.macroRow}>
           <Text style={styles.macroLabel}>Fat (g)</Text>
-          <View style={styles.macroInputContainer}>
-            <TouchableOpacity
-              style={styles.inputButton}
-              onPress={async () => {
-                const currentValue = parseFloat(fat) || 0;
-                setTempFatValue(currentValue);
-                await loadLastFat();
-                setShowFatPicker(true);
-              }}
-            >
-              <Text style={[styles.input, styles.inputButtonText]}>
-                {fat || '0'}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color="#999" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.penIconButton}
-              onPress={() => {
-                setShowFatEditor(true);
-              }}
-            >
-              <Ionicons name="create-outline" size={18} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
+          <TextInput
+            ref={fatInputRef}
+            style={[styles.input, styles.macroInput]}
+            value={fat}
+            onChangeText={setFat}
+            placeholder="0"
+            keyboardType="numeric"
+            returnKeyType="done"
+            onKeyPress={({ nativeEvent }) =>
+              handleArrowNavigation(nativeEvent.key, carbsInputRef, undefined)
+            }
+          />
         </View>
       </View>
 
@@ -451,169 +410,6 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
         </TouchableOpacity>
       )}
 
-      {/* Protein Picker Modal */}
-      <Modal
-        visible={showProteinPicker}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => setShowProteinPicker(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity
-              onPress={() => setShowProteinPicker(false)}
-              style={styles.modalCloseButton}
-            >
-              <Ionicons name="close" size={28} color={fontColor.secondary} />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Select Protein</Text>
-            <View style={styles.modalHeaderSpacer} />
-          </View>
-          
-          <View style={styles.modalContent}>
-            <MacroAmountPicker
-              value={tempProteinValue}
-              onChange={setTempProteinValue}
-              min={0}
-              max={1000}
-              sliderMax={100}
-              step={1}
-              label="Protein (g)"
-              lastSavedValue={lastSavedProtein}
-            />
-          </View>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={() => setShowProteinPicker(false)}
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalDoneButton}
-              onPress={async () => {
-                setProtein(tempProteinValue.toString());
-                await saveLastProtein(tempProteinValue);
-                await loadLastProtein();
-                setShowProteinPicker(false);
-              }}
-            >
-              <Text style={styles.modalDoneText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Carbs Picker Modal */}
-      <Modal
-        visible={showCarbsPicker}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => setShowCarbsPicker(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity
-              onPress={() => setShowCarbsPicker(false)}
-              style={styles.modalCloseButton}
-            >
-              <Ionicons name="close" size={28} color={fontColor.secondary} />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Select Carbs</Text>
-            <View style={styles.modalHeaderSpacer} />
-          </View>
-          
-          <View style={styles.modalContent}>
-            <MacroAmountPicker
-              value={tempCarbsValue}
-              onChange={setTempCarbsValue}
-              min={0}
-              max={1000}
-              sliderMax={200}
-              step={1}
-              label="Carbs (g)"
-              lastSavedValue={lastSavedCarbs}
-              quickValues={[10, 20, 40, 80]}
-            />
-          </View>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={() => setShowCarbsPicker(false)}
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalDoneButton}
-              onPress={async () => {
-                setCarbs(tempCarbsValue.toString());
-                await saveLastCarbs(tempCarbsValue);
-                await loadLastCarbs();
-                setShowCarbsPicker(false);
-              }}
-            >
-              <Text style={styles.modalDoneText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Fat Picker Modal */}
-      <Modal
-        visible={showFatPicker}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => setShowFatPicker(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity
-              onPress={() => setShowFatPicker(false)}
-              style={styles.modalCloseButton}
-            >
-              <Ionicons name="close" size={28} color={fontColor.secondary} />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Select Fat</Text>
-            <View style={styles.modalHeaderSpacer} />
-          </View>
-          
-          <View style={styles.modalContent}>
-            <MacroAmountPicker
-              value={tempFatValue}
-              onChange={setTempFatValue}
-              min={0}
-              max={1000}
-              sliderMax={100}
-              step={1}
-              label="Fat (g)"
-              lastSavedValue={lastSavedFat}
-            />
-          </View>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={() => setShowFatPicker(false)}
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalDoneButton}
-              onPress={async () => {
-                setFat(tempFatValue.toString());
-                await saveLastFat(tempFatValue);
-                await loadLastFat();
-                setShowFatPicker(false);
-              }}
-            >
-              <Text style={styles.modalDoneText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       {/* Quantity Editor Modal */}
       <NumberEditor
         visible={showQuantityEditor}
@@ -627,63 +423,6 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
         max={999}
         title="Number of Servings"
         unit="servings"
-        keyboardType="numeric"
-        hideRange={true}
-      />
-
-      {/* Protein Editor Modal */}
-      <NumberEditor
-        visible={showProteinEditor}
-        value={parseFloat(protein) || 0}
-        onSave={async (value) => {
-          setProtein(value.toString());
-          await saveLastProtein(value);
-          await loadLastProtein();
-          setShowProteinEditor(false);
-        }}
-        onCancel={() => setShowProteinEditor(false)}
-        min={0}
-        max={1000}
-        title="Protein"
-        unit="g"
-        keyboardType="numeric"
-        hideRange={true}
-      />
-
-      {/* Carbs Editor Modal */}
-      <NumberEditor
-        visible={showCarbsEditor}
-        value={parseFloat(carbs) || 0}
-        onSave={async (value) => {
-          setCarbs(value.toString());
-          await saveLastCarbs(value);
-          await loadLastCarbs();
-          setShowCarbsEditor(false);
-        }}
-        onCancel={() => setShowCarbsEditor(false)}
-        min={0}
-        max={1000}
-        title="Carbs"
-        unit="g"
-        keyboardType="numeric"
-        hideRange={true}
-      />
-
-      {/* Fat Editor Modal */}
-      <NumberEditor
-        visible={showFatEditor}
-        value={parseFloat(fat) || 0}
-        onSave={async (value) => {
-          setFat(value.toString());
-          await saveLastFat(value);
-          await loadLastFat();
-          setShowFatEditor(false);
-        }}
-        onCancel={() => setShowFatEditor(false)}
-        min={0}
-        max={1000}
-        title="Fat"
-        unit="g"
         keyboardType="numeric"
         hideRange={true}
       />
@@ -758,15 +497,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  macroInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  penIconButton: {
-    padding: spacing.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
+  macroInput: {
+    minWidth: 100,
+    textAlign: 'right',
   },
   macroLabel: {
     fontSize: fontSize.base,
@@ -795,71 +528,6 @@ const styles = StyleSheet.create({
     color: fontColor.inverse,
     fontSize: fontSize.lg,
     fontWeight: '600',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingTop: 60,
-    paddingBottom: spacing.xl,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  modalCloseButton: {
-    padding: spacing.sm,
-  },
-  modalTitle: {
-    fontSize: fontSize.xl,
-    fontWeight: '600',
-    color: fontColor.secondary,
-  },
-  modalHeaderSpacer: {
-    width: 44,
-  },
-  modalContent: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: 40,
-    paddingTop: spacing.xl,
-    gap: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
-  modalCancelButton: {
-    flex: 1,
-    paddingVertical: spacing.lg,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border.medium,
-    alignItems: 'center',
-    backgroundColor: colors.background.secondary,
-  },
-  modalCancelText: {
-    fontSize: fontSize.base,
-    fontWeight: '600',
-    color: fontColor.tertiary,
-  },
-  modalDoneButton: {
-    flex: 1,
-    paddingVertical: spacing.lg,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-  },
-  modalDoneText: {
-    fontSize: fontSize.base,
-    fontWeight: '600',
-    color: fontColor.inverse,
   },
   infoRow: {
     flexDirection: 'row',
