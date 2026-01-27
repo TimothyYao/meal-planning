@@ -172,8 +172,9 @@ export async function addFoodToDate(food: FoodItem, quantity: number = 1, date: 
       };
     }
     
-    // Create a meal food entry
+    // Create a meal food entry with a unique ID
     const mealFood: MealFood = {
+      id: await generateFoodId(), // unique ID for this log entry
       foodId: food.id,
       food,
       quantity,

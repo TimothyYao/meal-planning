@@ -32,6 +32,7 @@ describe('DailyLogRepository', () => {
 
   // Sample meal foods
   const chickenMealFood: MealFood = {
+    id: 'mealfood-chicken-1',
     foodId: 'food-chicken',
     food: chickenFood,
     quantity: 1,
@@ -39,6 +40,7 @@ describe('DailyLogRepository', () => {
   };
 
   const riceMealFood: MealFood = {
+    id: 'mealfood-rice-1',
     foodId: 'food-rice',
     food: riceFood,
     quantity: 1.5,
