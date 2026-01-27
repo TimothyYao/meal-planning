@@ -154,9 +154,9 @@ export default function FoodDetailScreen() {
   const handleEdit = () => {
     if (!mealFood) return;
     try {
-      // Navigate to EditFood screen with all necessary parameters
+      // Navigate to EditFood screen with the food data directly (no database lookup needed)
       (navigation as any).navigate('EditFood', { 
-        foodId: mealFood.food.id,
+        food: mealFood.food,
         mealId,
         foodIndex,
         date,
@@ -166,7 +166,7 @@ export default function FoodDetailScreen() {
       console.error('Navigation error:', error);
       // Fallback: try using push
       (navigation as any).push('EditFood', { 
-        foodId: mealFood.food.id,
+        food: mealFood.food,
         mealId,
         foodIndex,
         date,

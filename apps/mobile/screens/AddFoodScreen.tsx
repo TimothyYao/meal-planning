@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useRef, useState } from 'react';
 import { FoodItem, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
-import { saveFood, addFoodToDate } from '../storage';
+import { addFoodToDate } from '../storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
 import { safeGoBack } from '../utils/navigation';
 
@@ -43,10 +43,7 @@ export default function AddFoodScreen() {
     
     setIsSaving(true);
     try {
-      // Save food to database (cache first, then Firebase)
-      await saveFood(foodItem);
-      
-      // Add to selected date's log
+      // Add directly to selected date's log (food data is embedded in the log entry)
       const selectedDate = date || new Date();
       const dateString = formatDateString(selectedDate);
       await addFoodToDate(foodItem, quantity, dateString);
@@ -61,8 +58,8 @@ export default function AddFoodScreen() {
         },
       ]);
     } catch (error) {
-      console.error('Error saving food:', error);
-      Alert.alert('Error', 'Failed to save food. Please try again.');
+      console.error('Error adding food:', error);
+      Alert.alert('Error', 'Failed to add food. Please try again.');
     } finally {
       setIsSaving(false);
     }

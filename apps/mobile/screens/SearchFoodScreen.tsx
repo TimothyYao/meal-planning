@@ -1,11 +1,10 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert, SectionList, Animated } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert, SectionList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { FoodItem, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
-import { getFoods, addFoodToDate, saveFood, deleteFood } from '../storage';
+import { addFoodToDate, getRecentFoods } from '../storage';
 import { safeGoBack } from '../utils/navigation';
 import { searchUSDAFoods, convertUSDAToFoodItem, isUSDAAvailable } from '../utils/usdaApi';
 import { getCachedSearch, cacheSearch } from '../utils/usdaCache';
@@ -33,8 +32,6 @@ export default function SearchFoodScreen() {
   const [offError, setOffError] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
-  const currentOpenSwipeable = useRef<Swipeable | null>(null);
 
   useEffect(() => {
     // Autofocus the input when screen loads
@@ -201,9 +198,11 @@ export default function SearchFoodScreen() {
   const loadHistoryFoods = async () => {
     try {
       setLoadingHistory(true);
-      const allFoods = await getFoods();
-      setHistoryFoods(allFoods);
-      setFilteredHistoryFoods(allFoods);
+      // Get recent foods from log entries (no separate food database)
+      const recentFoods = await getRecentFoods(50);
+      const foods = recentFoods.map(rf => rf.food);
+      setHistoryFoods(foods);
+      setFilteredHistoryFoods(foods);
     } catch (error) {
       console.error('Error loading foods:', error);
     } finally {
@@ -219,13 +218,9 @@ export default function SearchFoodScreen() {
     return `${year}-${month}-${day}`;
   };
 
-  const handleFoodSelect = async (food: FoodItem, isUSDA: boolean = false) => {
+  const handleFoodSelect = async (food: FoodItem) => {
     try {
-      // If it's a USDA food, save it to local database first
-      if (isUSDA) {
-        await saveFood(food);
-      }
-
+      // Add directly to today's log (food data is embedded in the log entry)
       const today = new Date();
       const dateString = formatDateString(today);
       await addFoodToDate(food, 1, dateString);
@@ -243,49 +238,17 @@ export default function SearchFoodScreen() {
     }
   };
 
-  const handleEditFood = async (food: FoodItem, isUSDA: boolean = false) => {
-    try {
-      // Close any open swipeable
-      if (currentOpenSwipeable.current) {
-        currentOpenSwipeable.current.close();
-        currentOpenSwipeable.current = null;
-      }
-      
-      // If it's a USDA food, save it to local database first so it can be edited
-      if (isUSDA) {
-        await saveFood(food);
-      }
-      
-      // Navigate to AddFood screen with the food as duplicateFood for editing
-      (navigation as any).navigate('AddFood', { duplicateFood: food });
-    } catch (error) {
-      console.error('Error preparing food for edit:', error);
-      Alert.alert('Error', 'Failed to open food for editing. Please try again.');
-    }
-  };
-
-  const handleDeleteFood = async (food: FoodItem) => {
-    try {
-      await deleteFood(food.id);
-      // Reload history foods
-      await loadHistoryFoods();
-    } catch (error) {
-      console.error('Error deleting food:', error);
-      Alert.alert('Error', 'Failed to delete food. Please try again.');
-    }
-  };
-
-  const handleSwipeWillOpen = (swipeable: Swipeable) => {
-    // Close the currently open Swipeable if there is one
-    if (currentOpenSwipeable.current && currentOpenSwipeable.current !== swipeable) {
+  const handleEditFood = (food: FoodItem) => {
+    // Close any open swipeable
+    if (currentOpenSwipeable.current) {
       currentOpenSwipeable.current.close();
+      currentOpenSwipeable.current = null;
     }
-    currentOpenSwipeable.current = swipeable;
+    
+    // Navigate to AddFood screen with the food as duplicateFood for editing
+    (navigation as any).navigate('AddFood', { duplicateFood: food });
   };
 
-  const handleSwipeClose = () => {
-    currentOpenSwipeable.current = null;
-  };
 
   const getSections = (): SearchSection[] => {
     const sections: SearchSection[] = [];
@@ -317,51 +280,12 @@ export default function SearchFoodScreen() {
     return sections;
   };
 
-  const renderRightActions = (
-    progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>,
-    item: FoodItem
-  ) => {
-    const scale = dragX.interpolate({
-      inputRange: [-100, 0],
-      outputRange: [1, 0],
-      extrapolate: 'clamp',
-    });
-
-    return (
-      <View style={styles.deleteContainer}>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => {
-            currentOpenSwipeable.current?.close();
-            setTimeout(() => handleDeleteFood(item), 100);
-          }}
-          activeOpacity={0.7}
-        >
-          <Animated.View style={[styles.deleteButtonContent, { transform: [{ scale }] }]}>
-            <Ionicons name="trash-outline" size={24} color="#fff" />
-            <Text style={styles.deleteText}>Delete</Text>
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
   const renderFoodItem = ({ item, section }: { item: FoodItem; section: SearchSection }) => {
-    const foodItemKey = `${section.type}_${item.id}`;
-    const isHistory = section.type === 'history';
-    
-    const foodContent = (
+    return (
       <View style={styles.foodItem}>
         <TouchableOpacity
           style={styles.foodItemContent}
-          onPress={() => {
-            if (currentOpenSwipeable.current) {
-              currentOpenSwipeable.current.close();
-              return;
-            }
-            handleFoodSelect(item, section.type === 'usda' || section.type === 'off');
-          }}
+          onPress={() => handleFoodSelect(item)}
           activeOpacity={0.7}
         >
           <View style={styles.foodContent}>
@@ -381,14 +305,14 @@ export default function SearchFoodScreen() {
         <View style={styles.foodActions}>
           <TouchableOpacity
             style={[styles.actionButton, { marginRight: spacing.sm }]}
-            onPress={() => handleEditFood(item, section.type === 'usda' || section.type === 'off')}
+            onPress={() => handleEditFood(item)}
             activeOpacity={0.7}
           >
             <Ionicons name="create-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => handleFoodSelect(item, section.type === 'usda' || section.type === 'off')}
+            onPress={() => handleFoodSelect(item)}
             activeOpacity={0.7}
           >
             <Ionicons name="add-circle" size={22} color={colors.primary} />
@@ -396,35 +320,6 @@ export default function SearchFoodScreen() {
         </View>
       </View>
     );
-
-    // Only wrap history items with Swipeable
-    if (isHistory) {
-      return (
-        <Swipeable
-          ref={(ref) => {
-            if (ref) {
-              swipeableRefs.current.set(foodItemKey, ref);
-            } else {
-              swipeableRefs.current.delete(foodItemKey);
-            }
-          }}
-          renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, item)}
-          rightThreshold={40}
-          overshootRight={false}
-          friction={2}
-          onSwipeableWillOpen={() => {
-            if (swipeableRefs.current.get(foodItemKey)) {
-              handleSwipeWillOpen(swipeableRefs.current.get(foodItemKey)!);
-            }
-          }}
-          onSwipeableClose={() => handleSwipeClose()}
-        >
-          {foodContent}
-        </Swipeable>
-      );
-    }
-
-    return foodContent;
   };
 
   const renderSectionHeader = ({ section }: { section: SearchSection }) => (
@@ -677,28 +572,5 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: fontColor.tertiary,
     marginLeft: spacing.sm,
-  },
-  deleteContainer: {
-    width: 100,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    backgroundColor: colors.cancel,
-  },
-  deleteButton: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 100,
-    paddingHorizontal: spacing.xl,
-  },
-  deleteButtonContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteText: {
-    color: fontColor.inverse,
-    fontSize: fontSize.xs,
-    fontWeight: '600',
-    marginTop: spacing.xs,
   },
 });
