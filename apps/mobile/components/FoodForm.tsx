@@ -94,6 +94,9 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
   const [isLoadingLastDate, setIsLoadingLastDate] = useState(!initialDate && showDate);
   const [servingPickerExpanded, setServingPickerExpanded] = useState(false);
   const [showQuantityEditor, setShowQuantityEditor] = useState(false);
+  const [showProteinEditor, setShowProteinEditor] = useState(false);
+  const [showCarbsEditor, setShowCarbsEditor] = useState(false);
+  const [showFatEditor, setShowFatEditor] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const nameInputRef = useRef<TextInput>(null);
@@ -347,54 +350,78 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
 
         <View style={styles.macroRow}>
           <Text style={styles.macroLabel}>Protein (g)</Text>
-          <TextInput
-            ref={proteinInputRef}
-            style={[styles.input, styles.macroInput]}
-            value={protein}
-            onChangeText={setProtein}
-            placeholder="0"
-            keyboardType="numeric"
-            returnKeyType="next"
-            blurOnSubmit={false}
-            onSubmitEditing={() => carbsInputRef.current?.focus()}
-            onKeyPress={({ nativeEvent }) =>
-              handleArrowNavigation(nativeEvent.key, nameInputRef, carbsInputRef)
-            }
-          />
+          <View style={styles.macroInputContainer}>
+            <TextInput
+              ref={proteinInputRef}
+              style={[styles.input, styles.macroInput]}
+              value={protein}
+              onChangeText={setProtein}
+              placeholder="0"
+              keyboardType="numeric"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => carbsInputRef.current?.focus()}
+              onKeyPress={({ nativeEvent }) =>
+                handleArrowNavigation(nativeEvent.key, nameInputRef, carbsInputRef)
+              }
+            />
+            <TouchableOpacity
+              style={styles.penIconButton}
+              onPress={() => setShowProteinEditor(true)}
+            >
+              <Ionicons name="create-outline" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.macroRow}>
           <Text style={styles.macroLabel}>Carbs (g)</Text>
-          <TextInput
-            ref={carbsInputRef}
-            style={[styles.input, styles.macroInput]}
-            value={carbs}
-            onChangeText={setCarbs}
-            placeholder="0"
-            keyboardType="numeric"
-            returnKeyType="next"
-            blurOnSubmit={false}
-            onSubmitEditing={() => fatInputRef.current?.focus()}
-            onKeyPress={({ nativeEvent }) =>
-              handleArrowNavigation(nativeEvent.key, proteinInputRef, fatInputRef)
-            }
-          />
+          <View style={styles.macroInputContainer}>
+            <TextInput
+              ref={carbsInputRef}
+              style={[styles.input, styles.macroInput]}
+              value={carbs}
+              onChangeText={setCarbs}
+              placeholder="0"
+              keyboardType="numeric"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => fatInputRef.current?.focus()}
+              onKeyPress={({ nativeEvent }) =>
+                handleArrowNavigation(nativeEvent.key, proteinInputRef, fatInputRef)
+              }
+            />
+            <TouchableOpacity
+              style={styles.penIconButton}
+              onPress={() => setShowCarbsEditor(true)}
+            >
+              <Ionicons name="create-outline" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.macroRow}>
           <Text style={styles.macroLabel}>Fat (g)</Text>
-          <TextInput
-            ref={fatInputRef}
-            style={[styles.input, styles.macroInput]}
-            value={fat}
-            onChangeText={setFat}
-            placeholder="0"
-            keyboardType="numeric"
-            returnKeyType="done"
-            onKeyPress={({ nativeEvent }) =>
-              handleArrowNavigation(nativeEvent.key, carbsInputRef, undefined)
-            }
-          />
+          <View style={styles.macroInputContainer}>
+            <TextInput
+              ref={fatInputRef}
+              style={[styles.input, styles.macroInput]}
+              value={fat}
+              onChangeText={setFat}
+              placeholder="0"
+              keyboardType="numeric"
+              returnKeyType="done"
+              onKeyPress={({ nativeEvent }) =>
+                handleArrowNavigation(nativeEvent.key, carbsInputRef, undefined)
+              }
+            />
+            <TouchableOpacity
+              style={styles.penIconButton}
+              onPress={() => setShowFatEditor(true)}
+            >
+              <Ionicons name="create-outline" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -423,6 +450,57 @@ const FoodForm = forwardRef<FoodFormRef, FoodFormProps>(({
         max={999}
         title="Number of Servings"
         unit="servings"
+        keyboardType="numeric"
+        hideRange={true}
+      />
+
+      <NumberEditor
+        visible={showProteinEditor}
+        value={parseFloat(protein) || 0}
+        onSave={async (value) => {
+          setProtein(value.toString());
+          await saveLastProtein(value);
+          setShowProteinEditor(false);
+        }}
+        onCancel={() => setShowProteinEditor(false)}
+        min={0}
+        max={1000}
+        title="Protein"
+        unit="g"
+        keyboardType="numeric"
+        hideRange={true}
+      />
+
+      <NumberEditor
+        visible={showCarbsEditor}
+        value={parseFloat(carbs) || 0}
+        onSave={async (value) => {
+          setCarbs(value.toString());
+          await saveLastCarbs(value);
+          setShowCarbsEditor(false);
+        }}
+        onCancel={() => setShowCarbsEditor(false)}
+        min={0}
+        max={1000}
+        title="Carbs"
+        unit="g"
+        keyboardType="numeric"
+        hideRange={true}
+      />
+
+      <NumberEditor
+        visible={showFatEditor}
+        value={parseFloat(fat) || 0}
+        onSave={async (value) => {
+          setFat(value.toString());
+          await saveLastFat(value);
+          setShowFatEditor(false);
+        }}
+        onCancel={() => setShowFatEditor(false)}
+        min={0}
+        max={1000}
+        title="Fat"
+        unit="g"
         keyboardType="numeric"
         hideRange={true}
       />
@@ -497,9 +575,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
+  macroInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexShrink: 0,
+  },
   macroInput: {
     minWidth: 100,
     textAlign: 'right',
+  },
+  penIconButton: {
+    padding: spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   macroLabel: {
     fontSize: fontSize.base,
