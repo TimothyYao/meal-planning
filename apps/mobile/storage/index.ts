@@ -6,7 +6,7 @@
  */
 
 // Utilities
-export { generateFoodId, getTodayDate } from './utils';
+export { generateFoodId, getTodayDate, clearAllCaches } from './utils';
 
 // Food operations (legacy - kept for backward compatibility)
 export {

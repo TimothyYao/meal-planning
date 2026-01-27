@@ -35,6 +35,10 @@ const mockAsyncStorage = {
     mockStore.delete(key);
     return Promise.resolve();
   }),
+  multiRemove: jest.fn((keys) => {
+    keys.forEach((key) => mockStore.delete(key));
+    return Promise.resolve();
+  }),
   clear: jest.fn(() => {
     mockStore.clear();
     return Promise.resolve();

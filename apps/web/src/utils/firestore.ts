@@ -424,3 +424,30 @@ export async function syncLocalCacheToFirestore(): Promise<void> {
     throw error;
   }
 }
+
+/**
+ * Clear all local cache data
+ * This should be called on logout to ensure user data is properly cleared
+ */
+export function clearLocalCache(): void {
+  try {
+    // Get all keys with our cache prefix
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(CACHE_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    // Remove all cache keys
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    // Also remove the sync timestamp
+    localStorage.removeItem(SYNC_TIMESTAMP_KEY);
+    
+    console.log('Local cache cleared successfully');
+  } catch (error) {
+    console.error('Error clearing local cache:', error);
+  }
+}
