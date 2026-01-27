@@ -238,18 +238,6 @@ export default function SearchFoodScreen() {
     }
   };
 
-  const handleEditFood = (food: FoodItem) => {
-    // Close any open swipeable
-    if (currentOpenSwipeable.current) {
-      currentOpenSwipeable.current.close();
-      currentOpenSwipeable.current = null;
-    }
-    
-    // Navigate to AddFood screen with the food as duplicateFood for editing
-    (navigation as any).navigate('AddFood', { duplicateFood: food });
-  };
-
-
   const getSections = (): SearchSection[] => {
     const sections: SearchSection[] = [];
     
@@ -303,13 +291,6 @@ export default function SearchFoodScreen() {
           </View>
         </TouchableOpacity>
         <View style={styles.foodActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, { marginRight: spacing.sm }]}
-            onPress={() => handleEditFood(item)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="create-outline" size={20} color={colors.primary} />
-          </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => handleFoodSelect(item)}
