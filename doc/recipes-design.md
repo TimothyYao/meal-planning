@@ -1,6 +1,6 @@
 # Recipes Design
 
-This document provides a comprehensive design for the recipes feature, including how to create foods, combine them into recipes, and use recipes for macro tracking.
+This document provides a comprehensive design for the recipes feature, including how to create foods, combine them into recipes, and use recipes for macro tracking. The design is optimized for **Firebase Firestore** with direct client access using a **repository pattern**.
 
 ## Overview
 
@@ -9,40 +9,53 @@ The recipes system enables users to:
 2. **Build Recipes** - Combine multiple foods into reusable recipes
 3. **Track with Recipes** - Log recipes to daily meal tracking for macro monitoring
 
-## Entity Relationships
+## Firestore Data Structure
 
-The following diagram shows how the core entities relate to each other in the recipes and tracking system:
+The following diagram shows the Firestore collection hierarchy for the recipes and tracking system:
+
+```mermaid
+flowchart TB
+    subgraph Firestore["Firestore Database"]
+        subgraph Users["users (collection)"]
+            UserDoc["{userId} (document)"]
+            
+            subgraph UserSubcollections["Subcollections"]
+                Profile["profile/data"]
+                Foods["foods/{foodId}"]
+                Recipes["recipes/{recipeId}"]
+                DailyLogs["dailyLogs/{YYYY-MM-DD}"]
+            end
+        end
+    end
+    
+    UserDoc --> Profile
+    UserDoc --> Foods
+    UserDoc --> Recipes
+    UserDoc --> DailyLogs
+```
+
+### Collection Paths
+
+| Collection | Path | Document ID | Description |
+|------------|------|-------------|-------------|
+| User Profile | `users/{userId}/profile/data` | `data` (singleton) | User settings and macro targets |
+| Foods | `users/{userId}/foods/{foodId}` | Auto-generated UUID | Custom food items |
+| Recipes | `users/{userId}/recipes/{recipeId}` | Auto-generated UUID | User-created recipes |
+| Daily Logs | `users/{userId}/dailyLogs/{date}` | `YYYY-MM-DD` | Daily meal tracking |
+
+### Document Schemas
 
 ```mermaid
 erDiagram
-    UserProfile ||--o{ Recipe : creates
-    UserProfile ||--o{ FoodItem : creates
-    UserProfile ||--o{ DailyLog : has
-    
-    FoodItem ||--o{ RecipeIngredient : "used in"
-    FoodItem ||--o{ MealFood : "used in"
-    
-    Recipe ||--|{ RecipeIngredient : contains
-    Recipe {
-        string id PK
-        string name
-        string description
-        number servings
-        MacroTargets macros
-        number prepTime
-        number cookTime
-        string category
-        string[] tags
-        boolean isPublic
-        string createdBy FK
-        date createdAt
-        date updatedAt
-    }
-    
-    RecipeIngredient {
-        string foodId FK
-        number quantity
-        string notes
+    UserProfile {
+        string displayName
+        string photoURL
+        MacroTargets targetMacros
+        number age
+        number height
+        number weight
+        string goal
+        Timestamp updatedAt
     }
     
     FoodItem {
@@ -50,275 +63,487 @@ erDiagram
         string name
         string brand
         string barcode
-        MacroTargets macros
-        number servingSize
-        string servingUnit
-        string category
-        string source
-    }
-    
-    DailyLog ||--|{ Meal : contains
-    DailyLog {
-        string date PK
-        MacroTargets totalMacros
-        MacroTargets targetMacros
-        number weight
-        string notes
-    }
-    
-    Meal ||--|{ MealFood : contains
-    Meal {
-        string id PK
-        string name
-        date timestamp
-        MacroTargets macros
-        string notes
-        string recipeId FK
-    }
-    
-    MealFood {
-        string foodId FK
-        number quantity
-    }
-    
-    MacroTargets {
         number calories
         number protein
         number carbs
         number fat
+        number servingSize
+        string servingUnit
+        string category
+        string source
+        Timestamp createdAt
+        Timestamp updatedAt
+    }
+    
+    Recipe {
+        string id PK
+        string name
+        string description
+        number servings
+        number calories
+        number protein
+        number carbs
+        number fat
+        number prepTime
+        number cookTime
+        string category
+        string[] tags
+        RecipeIngredient[] ingredients
+        string[] instructions
+        Timestamp createdAt
+        Timestamp updatedAt
+    }
+    
+    RecipeIngredient {
+        string foodId FK
+        string foodName
+        number quantity
+        number servingSize
+        string servingUnit
+        number calories
+        number protein
+        number carbs
+        number fat
+        string notes
+    }
+    
+    DailyLog {
+        string date PK
+        Meal[] meals
+        MacroTargets totalMacros
+        MacroTargets targetMacros
+        Timestamp updatedAt
+    }
+    
+    Meal {
+        string id
+        string name
+        MealFood[] foods
+        Timestamp timestamp
+        MacroTargets macros
+        string recipeId
+        number recipeServings
+    }
+    
+    MealFood {
+        string foodId FK
+        FoodItem food
+        number quantity
+        Timestamp addedAt
     }
 ```
 
-## Food Creation
+## Firestore Optimization Strategies
 
-### Food Sources
+### 1. Denormalization for Read Performance
 
-Foods can be added to the system from multiple sources:
+Firestore charges per document read, so we denormalize data to minimize reads:
+
+```mermaid
+flowchart LR
+    subgraph Normalized["Normalized (More Reads)"]
+        Recipe1["Recipe Doc"]
+        Ingredient1["Ingredient 1<br/>(foodId only)"]
+        Ingredient2["Ingredient 2<br/>(foodId only)"]
+        Food1["Food Doc 1"]
+        Food2["Food Doc 2"]
+        
+        Recipe1 --> Ingredient1
+        Recipe1 --> Ingredient2
+        Ingredient1 -.-> Food1
+        Ingredient2 -.-> Food2
+    end
+    
+    subgraph Denormalized["Denormalized (Fewer Reads)"]
+        Recipe2["Recipe Doc"]
+        IngredientEmbed1["Ingredient 1<br/>(embedded food data)"]
+        IngredientEmbed2["Ingredient 2<br/>(embedded food data)"]
+        
+        Recipe2 --> IngredientEmbed1
+        Recipe2 --> IngredientEmbed2
+    end
+```
+
+**Recipe Ingredient Storage Strategy:**
+- Store essential food data (name, macros, serving info) directly in recipe ingredients
+- Store `foodId` reference for updates/linking
+- Avoids N+1 reads when loading recipes
+
+### 2. Embedded vs. Subcollection Decision
+
+```mermaid
+flowchart TD
+    Question{"Data Size?"}
+    
+    Question -->|"< 1MB total<br/>< 100 items"| Embed["Embed in Document"]
+    Question -->|"> 1MB total<br/>> 100 items"| Subcollection["Use Subcollection"]
+    
+    Embed --> Examples1["• Meals in DailyLog<br/>• Ingredients in Recipe<br/>• Foods in Meal"]
+    Subcollection --> Examples2["• Foods collection<br/>• Recipes collection<br/>• DailyLogs collection"]
+```
+
+**Current Design Decisions:**
+| Data | Storage | Reason |
+|------|---------|--------|
+| Meals | Embedded in DailyLog | Typically < 10 meals/day |
+| Foods in Meal | Embedded in Meal | Typically < 20 foods/meal |
+| Recipe Ingredients | Embedded in Recipe | Typically < 30 ingredients |
+| User Foods | Subcollection | Can grow unbounded |
+| User Recipes | Subcollection | Can grow unbounded |
+
+### 3. Index Strategy
 
 ```mermaid
 flowchart TB
-    subgraph Sources["Food Sources"]
+    subgraph Indexes["Firestore Indexes"]
+        subgraph Single["Single-Field (Automatic)"]
+            I1["recipes.name"]
+            I2["recipes.category"]
+            I3["recipes.createdAt"]
+            I4["foods.name"]
+            I5["foods.barcode"]
+        end
+        
+        subgraph Composite["Composite (Manual)"]
+            C1["recipes: category + createdAt DESC"]
+            C2["recipes: tags (array-contains) + createdAt DESC"]
+            C3["foods: category + name ASC"]
+        end
+    end
+```
+
+## Repository Pattern Architecture
+
+The repository pattern provides a clean abstraction over Firestore operations with local caching support.
+
+```mermaid
+flowchart TB
+    subgraph UI["UI Layer"]
+        Components["React Components"]
+        Hooks["Custom Hooks"]
+    end
+    
+    subgraph Repository["Repository Layer"]
+        FoodRepo["FoodRepository"]
+        RecipeRepo["RecipeRepository"]
+        DailyLogRepo["DailyLogRepository"]
+    end
+    
+    subgraph Storage["Storage Layer"]
+        FirestoreService["Firestore Service"]
+        LocalCache["AsyncStorage Cache"]
+    end
+    
+    subgraph Firebase["Firebase"]
+        Firestore["Cloud Firestore"]
+    end
+    
+    Components --> Hooks
+    Hooks --> FoodRepo
+    Hooks --> RecipeRepo
+    Hooks --> DailyLogRepo
+    
+    FoodRepo --> FirestoreService
+    FoodRepo --> LocalCache
+    RecipeRepo --> FirestoreService
+    RecipeRepo --> LocalCache
+    DailyLogRepo --> FirestoreService
+    DailyLogRepo --> LocalCache
+    
+    FirestoreService --> Firestore
+```
+
+### Repository Interface Design
+
+```mermaid
+classDiagram
+    class BaseRepository~T~ {
+        <<interface>>
+        +getById(id: string) Promise~T~
+        +getAll() Promise~T[]~
+        +save(item: T) Promise~void~
+        +delete(id: string) Promise~void~
+        +subscribe(callback) unsubscribe
+    }
+    
+    class FoodRepository {
+        +searchByName(query: string) Promise~FoodItem[]~
+        +getByBarcode(barcode: string) Promise~FoodItem~
+        +getRecent(limit: number) Promise~FoodItem[]~
+    }
+    
+    class RecipeRepository {
+        +getByCategory(category: string) Promise~Recipe[]~
+        +getByTags(tags: string[]) Promise~Recipe[]~
+        +duplicate(recipeId: string) Promise~Recipe~
+        +calculateMacros(ingredients: RecipeIngredient[]) MacroTargets
+    }
+    
+    class DailyLogRepository {
+        +getByDate(date: string) Promise~DailyLog~
+        +addMeal(date: string, meal: Meal) Promise~void~
+        +addRecipeAsMeal(date: string, recipeId: string, servings: number) Promise~void~
+        +updateMeal(date: string, mealId: string, meal: Meal) Promise~void~
+        +removeMeal(date: string, mealId: string) Promise~void~
+    }
+    
+    BaseRepository <|-- FoodRepository
+    BaseRepository <|-- RecipeRepository
+    BaseRepository <|-- DailyLogRepository
+```
+
+### Cache-First Strategy
+
+```mermaid
+sequenceDiagram
+    participant UI as UI Component
+    participant Repo as Repository
+    participant Cache as Local Cache
+    participant FS as Firestore
+    
+    UI->>Repo: getData()
+    
+    Repo->>Cache: Check cache
+    
+    alt Cache Hit
+        Cache-->>Repo: Cached data
+        Repo-->>UI: Return immediately
+        
+        Note over Repo,FS: Background sync
+        Repo->>FS: Fetch latest (async)
+        FS-->>Repo: Fresh data
+        Repo->>Cache: Update cache
+        Repo-->>UI: Notify if changed
+    else Cache Miss
+        Repo->>FS: Fetch from Firestore
+        FS-->>Repo: Data
+        Repo->>Cache: Store in cache
+        Repo-->>UI: Return data
+    end
+```
+
+### Write-Through Cache Pattern
+
+```mermaid
+sequenceDiagram
+    participant UI as UI Component
+    participant Repo as Repository
+    participant Cache as Local Cache
+    participant FS as Firestore
+    
+    UI->>Repo: saveData(item)
+    
+    Repo->>Cache: Write to cache first
+    Cache-->>Repo: Success
+    Repo-->>UI: Return immediately (optimistic)
+    
+    Note over Repo,FS: Async Firestore write
+    Repo->>FS: Write to Firestore
+    
+    alt Success
+        FS-->>Repo: Confirmed
+    else Failure
+        FS-->>Repo: Error
+        Repo->>Repo: Queue for retry
+        Note over Repo: Data persists in cache<br/>Will sync when online
+    end
+```
+
+## Food Creation Flow
+
+### Food Sources Integration
+
+```mermaid
+flowchart TB
+    subgraph Sources["External Food Sources"]
         USDA["USDA FoodData Central"]
         OFF["Open Food Facts"]
         Barcode["Barcode Scan"]
+    end
+    
+    subgraph App["App Layer"]
+        Search["Food Search"]
         Manual["Manual Entry"]
+        Validate["Validation"]
     end
     
-    subgraph Validation["Validation Layer"]
-        Validate["Validate Nutrition Data"]
-        Normalize["Normalize Units"]
-        Calculate["Calculate Macros/100g"]
+    subgraph Storage["Firestore Storage"]
+        UserFoods["users/{uid}/foods"]
     end
     
-    subgraph Storage["Storage"]
-        LocalDB["Local Cache"]
-        CloudDB["Cloud Database"]
-    end
-    
-    USDA --> Validate
-    OFF --> Validate
+    USDA --> Search
+    OFF --> Search
     Barcode --> OFF
+    
+    Search --> Validate
     Manual --> Validate
     
-    Validate --> Normalize
-    Normalize --> Calculate
-    Calculate --> LocalDB
-    Calculate --> CloudDB
+    Validate --> UserFoods
 ```
 
-### Food Creation Flow
-
-The following sequence diagram illustrates the food creation process:
+### Food Creation Sequence
 
 ```mermaid
 sequenceDiagram
     actor User
-    participant App as Mobile/Web App
-    participant API as Backend API
-    participant USDA as USDA API
-    participant OFF as Open Food Facts
-    participant DB as Database
+    participant App as App
+    participant FoodRepo as FoodRepository
+    participant Cache as Local Cache
+    participant FS as Firestore
+    participant API as External API
     
-    User->>App: Search for food or scan barcode
+    User->>App: Search "chicken breast"
     
-    alt Search by name
-        App->>API: searchFood(query)
-        API->>USDA: Search USDA database
-        USDA-->>API: Return results
-        API->>OFF: Search OFF database
-        OFF-->>API: Return results
-        API-->>App: Merged & deduplicated results
-    else Scan barcode
-        App->>API: lookupBarcode(code)
-        API->>OFF: Lookup by barcode
-        OFF-->>API: Return food data
-        API-->>App: Food details
-    end
+    App->>API: Search USDA/OFF
+    API-->>App: Results
+    App->>User: Display options
     
-    App->>User: Display food options
-    User->>App: Select food or create custom
+    User->>App: Select food
+    App->>App: Generate foodId (UUID)
     
-    alt Create custom food
-        User->>App: Enter food details
-        App->>App: Validate macro data
-        App->>API: createFood(foodData)
-        API->>DB: Save custom food
-        DB-->>API: Food saved
-        API-->>App: Food created
-    else Select existing food
-        App->>API: cacheFood(foodId)
-        API->>DB: Save to user's food cache
-    end
+    App->>FoodRepo: saveFood(food)
+    FoodRepo->>Cache: Write to AsyncStorage
+    Cache-->>FoodRepo: Done
+    FoodRepo-->>App: Success (optimistic)
     
-    App->>User: Food ready to use
+    Note over FoodRepo,FS: Background sync
+    FoodRepo->>FS: setDoc(users/{uid}/foods/{foodId})
+    FS-->>FoodRepo: Confirmed
+    
+    App->>User: Food saved
 ```
 
-### Food Data Validation
+### Food Validation Logic
 
 ```mermaid
 flowchart TD
-    Start["Food Data Input"] --> CheckName{"Name provided?"}
-    CheckName -->|No| ErrorName["Error: Name required"]
-    CheckName -->|Yes| CheckServing{"Serving size > 0?"}
+    Start["Food Input"] --> ValidateName{"Name?"}
+    ValidateName -->|Empty| ErrName["Error: Name required"]
+    ValidateName -->|Valid| ValidateServing{"Serving > 0?"}
     
-    CheckServing -->|No| ErrorServing["Error: Invalid serving"]
-    CheckServing -->|Yes| CheckMacros{"Macros valid?"}
+    ValidateServing -->|No| ErrServing["Error: Invalid serving"]
+    ValidateServing -->|Yes| ValidateMacros{"Macros >= 0?"}
     
-    CheckMacros -->|No| ErrorMacros["Error: Invalid macros"]
-    CheckMacros -->|Yes| CalcCalories["Calculate calories"]
+    ValidateMacros -->|No| ErrMacros["Error: Invalid macros"]
+    ValidateMacros -->|Yes| CalcCheck["Check: P×4 + C×4 + F×9 ≈ Cal?"]
     
-    CalcCalories --> ValidateCalories{"Calories match<br/>protein×4 + carbs×4 + fat×9<br/>±10%?"}
+    CalcCheck --> CalcMatch{"Within 10%?"}
+    CalcMatch -->|No| WarnCal["Warning: Check calories"]
+    CalcMatch -->|Yes| Valid["Valid"]
+    WarnCal --> Valid
     
-    ValidateCalories -->|No| WarnCalories["Warning: Calories may be incorrect"]
-    ValidateCalories -->|Yes| Success["Food Valid"]
-    WarnCalories --> Success
-    
-    Success --> Save["Save Food"]
+    Valid --> Save["Save to Firestore"]
 ```
 
-## Recipe Creation
+## Recipe Creation Flow
 
-### Recipe Building Flow
+### Recipe Building Process
 
 ```mermaid
 flowchart TB
-    subgraph Create["1. Create Recipe"]
-        Start["Start New Recipe"] --> Name["Enter Name & Description"]
-        Name --> Meta["Set Servings, Prep/Cook Time"]
-        Meta --> Category["Select Category & Tags"]
+    subgraph Phase1["1. Create Recipe"]
+        Start["New Recipe"] --> Name["Enter Name"]
+        Name --> Desc["Description (optional)"]
+        Desc --> Servings["Set Servings"]
+        Servings --> Category["Select Category"]
     end
     
-    subgraph Ingredients["2. Add Ingredients"]
-        Category --> SearchFood["Search for Food"]
-        SearchFood --> SelectFood["Select Food Item"]
-        SelectFood --> SetQuantity["Set Quantity"]
-        SetQuantity --> AddNotes["Add Notes (optional)"]
-        AddNotes --> AddMore{"Add more<br/>ingredients?"}
-        AddMore -->|Yes| SearchFood
-        AddMore -->|No| Preview
+    subgraph Phase2["2. Add Ingredients"]
+        Category --> SearchFood["Search Foods"]
+        SearchFood --> SelectFood["Select Food"]
+        SelectFood --> SetQty["Set Quantity"]
+        SetQty --> Notes["Add Notes (optional)"]
+        Notes --> More{"More?"}
+        More -->|Yes| SearchFood
+        More -->|No| Preview
     end
     
-    subgraph Calculate["3. Calculate & Save"]
-        Preview["Preview Recipe Macros"]
-        Preview --> AdjustServings["Adjust Serving Count"]
-        AdjustServings --> Instructions["Add Instructions (optional)"]
-        Instructions --> Save["Save Recipe"]
+    subgraph Phase3["3. Finalize"]
+        Preview["Preview Macros/Serving"]
+        Preview --> Instructions["Add Instructions (optional)"]
+        Instructions --> Tags["Add Tags (optional)"]
+        Tags --> Save["Save Recipe"]
     end
 ```
 
 ### Recipe Macro Calculation
 
-The recipe macros are calculated as the sum of all ingredient macros, then divided by the number of servings:
-
 ```mermaid
 flowchart LR
-    subgraph Ingredients["Ingredients"]
-        I1["Ingredient 1<br/>Food × Quantity"]
-        I2["Ingredient 2<br/>Food × Quantity"]
-        I3["Ingredient 3<br/>Food × Quantity"]
-        IN["...Ingredient N"]
+    subgraph Ingredients["Ingredients Array"]
+        I1["Chicken 200g<br/>P:62g C:0g F:7g"]
+        I2["Rice 150g<br/>P:4g C:39g F:0.4g"]
+        I3["Broccoli 100g<br/>P:2.8g C:7g F:0.4g"]
     end
     
-    subgraph Calculation["Calculation"]
-        Sum["Sum All Macros"]
-        Divide["÷ Servings"]
+    subgraph Calc["Calculation"]
+        Sum["Sum All:<br/>P:68.8g C:46g F:7.8g<br/>Cal: 532"]
+        Div["÷ 2 servings"]
     end
     
     subgraph Result["Per Serving"]
-        Macros["Recipe Macros<br/>Calories, P, C, F"]
+        Final["P:34.4g C:23g F:3.9g<br/>Cal: 266"]
     end
     
     I1 --> Sum
     I2 --> Sum
     I3 --> Sum
-    IN --> Sum
-    Sum --> Divide
-    Divide --> Macros
+    Sum --> Div
+    Div --> Final
 ```
 
-### Detailed Recipe Creation Sequence
+### Recipe Save Sequence
 
 ```mermaid
 sequenceDiagram
     actor User
-    participant App as Mobile/Web App
-    participant RecipeService as Recipe Service
-    participant FoodService as Food Service
-    participant DB as Database
+    participant App as App
+    participant RecipeRepo as RecipeRepository
+    participant FoodRepo as FoodRepository
+    participant Cache as Local Cache
+    participant FS as Firestore
     
-    User->>App: Create new recipe
-    App->>App: Initialize empty recipe
+    User->>App: Create recipe with ingredients
     
-    User->>App: Enter name, description, servings
-    
-    loop Add Ingredients
-        User->>App: Search for ingredient
-        App->>FoodService: searchFoods(query)
-        FoodService-->>App: Food results
-        App->>User: Display food options
-        
-        User->>App: Select food & quantity
-        App->>App: Add to ingredients list
-        App->>App: Recalculate total macros
-        App->>User: Show updated macros
+    loop Each Ingredient
+        App->>FoodRepo: getFoodById(foodId)
+        FoodRepo-->>App: Food data
+        App->>App: Build ingredient with embedded food data
     end
     
-    User->>App: Add instructions (optional)
-    User->>App: Save recipe
+    App->>App: Calculate per-serving macros
+    App->>App: Generate recipeId (UUID)
     
-    App->>RecipeService: createRecipe(recipeData)
-    RecipeService->>RecipeService: Validate recipe
-    RecipeService->>RecipeService: Calculate per-serving macros
-    RecipeService->>DB: Save recipe
-    DB-->>RecipeService: Recipe saved
-    RecipeService-->>App: Recipe created
-    App->>User: Recipe saved successfully
+    App->>RecipeRepo: saveRecipe(recipe)
+    RecipeRepo->>Cache: Write to AsyncStorage
+    Cache-->>RecipeRepo: Done
+    RecipeRepo-->>App: Success
+    
+    Note over RecipeRepo,FS: Background sync
+    RecipeRepo->>FS: setDoc(users/{uid}/recipes/{recipeId})
+    FS-->>RecipeRepo: Confirmed
+    
+    App->>User: Recipe saved
 ```
 
-### Recipe States
+### Recipe Document Structure
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Draft: Create New
-    
-    Draft --> Draft: Add/Remove Ingredients
-    Draft --> Draft: Edit Details
-    Draft --> Validating: Save
-    
-    Validating --> Invalid: Validation Failed
-    Validating --> Saved: Validation Passed
-    
-    Invalid --> Draft: Fix Issues
-    
-    Saved --> Editing: Edit Recipe
-    Editing --> Validating: Save Changes
-    Editing --> Saved: Cancel
-    
-    Saved --> Deleted: Delete
-    Deleted --> [*]
-    
-    Saved --> Published: Make Public
-    Published --> Saved: Make Private
+flowchart TB
+    subgraph RecipeDoc["Recipe Document"]
+        Meta["id: 'abc123'<br/>name: 'Chicken Stir Fry'<br/>servings: 4<br/>category: 'dinner'"]
+        
+        subgraph Macros["macros (per serving)"]
+            M["calories: 350<br/>protein: 35<br/>carbs: 25<br/>fat: 12"]
+        end
+        
+        subgraph Ingredients["ingredients[] (embedded)"]
+            Ing1["[0] foodId: 'f1'<br/>foodName: 'Chicken'<br/>quantity: 2<br/>calories: 330<br/>protein: 62g..."]
+            Ing2["[1] foodId: 'f2'<br/>foodName: 'Rice'<br/>quantity: 1.5<br/>calories: 180<br/>protein: 6g..."]
+        end
+        
+        Times["prepTime: 15<br/>cookTime: 20<br/>createdAt: Timestamp<br/>updatedAt: Timestamp"]
+    end
 ```
 
 ## Using Recipes for Tracking
@@ -327,312 +552,396 @@ stateDiagram-v2
 
 ```mermaid
 flowchart TB
-    subgraph Select["1. Select Recipe"]
-        Browse["Browse Recipes"] --> Filter["Filter by Category/Tags"]
-        Filter --> Search["Search Recipes"]
-        Search --> SelectRecipe["Select Recipe"]
+    subgraph Select["1. Select"]
+        Browse["Browse Recipes"]
+        Browse --> Filter["Filter/Search"]
+        Filter --> Choose["Select Recipe"]
     end
     
-    subgraph Customize["2. Customize Serving"]
-        SelectRecipe --> ViewDetails["View Recipe Details"]
-        ViewDetails --> SetServings["Set Number of Servings"]
-        SetServings --> PreviewMacros["Preview Meal Macros"]
+    subgraph Configure["2. Configure"]
+        Choose --> ViewMacros["View Macros/Serving"]
+        ViewMacros --> SetServings["Set Serving Count"]
+        SetServings --> SelectMeal["Select Meal Type"]
     end
     
-    subgraph Log["3. Log to Meal"]
-        PreviewMacros --> SelectMeal["Select Meal Type<br/>(Breakfast, Lunch, etc.)"]
-        SelectMeal --> Confirm["Confirm & Log"]
-        Confirm --> UpdateDaily["Update Daily Totals"]
+    subgraph Log["3. Log"]
+        SelectMeal --> CreateMeal["Create Meal Entry"]
+        CreateMeal --> UpdateTotals["Update Daily Totals"]
+        UpdateTotals --> SaveLog["Save to Firestore"]
     end
 ```
 
 ### Recipe to Meal Conversion
 
-When a recipe is logged, it creates a meal with the recipe's ingredients:
-
 ```mermaid
 flowchart LR
-    subgraph Recipe["Recipe (2 servings)"]
-        R_Name["Chicken Stir Fry"]
-        R_Macros["Per Serving:<br/>400 cal, 35g P<br/>30g C, 15g F"]
-        R_Ingredients["Ingredients:<br/>• Chicken 200g<br/>• Rice 150g<br/>• Vegetables 100g"]
+    subgraph Recipe["Recipe (4 servings)"]
+        R_Meta["Chicken Stir Fry"]
+        R_Macros["Per Serving:<br/>Cal: 350, P: 35g<br/>C: 25g, F: 12g"]
+        R_Ingredients["3 ingredients"]
     end
     
-    subgraph Conversion["Conversion<br/>(1.5 servings)"]
-        Multiply["Multiply by<br/>serving count"]
+    subgraph Conversion["Log 1.5 servings"]
+        Multiply["× 1.5"]
     end
     
-    subgraph Meal["Logged Meal"]
-        M_Name["Lunch: Chicken Stir Fry"]
-        M_Macros["600 cal, 52.5g P<br/>45g C, 22.5g F"]
-        M_Foods["Foods:<br/>• Chicken 300g<br/>• Rice 225g<br/>• Vegetables 150g"]
+    subgraph Meal["Meal Entry"]
+        M_Name["Lunch"]
+        M_Macros["Cal: 525, P: 52.5g<br/>C: 37.5g, F: 18g"]
+        M_Ref["recipeId: 'abc123'<br/>recipeServings: 1.5"]
     end
     
     Recipe --> Conversion
     Conversion --> Meal
 ```
 
-### Complete Tracking Flow Sequence
+### Tracking Flow Sequence
 
 ```mermaid
 sequenceDiagram
     actor User
-    participant App as Mobile/Web App
-    participant RecipeService as Recipe Service
-    participant TrackingService as Tracking Service
-    participant DB as Database
+    participant App as App
+    participant RecipeRepo as RecipeRepository
+    participant LogRepo as DailyLogRepository
+    participant Cache as Local Cache
+    participant FS as Firestore
     
     User->>App: Open daily log
-    App->>TrackingService: getDailyLog(date)
-    TrackingService->>DB: Fetch daily log
-    DB-->>TrackingService: Daily log data
-    TrackingService-->>App: Current log & progress
+    App->>LogRepo: getByDate("2024-01-15")
+    LogRepo->>Cache: Check cache
+    Cache-->>LogRepo: Log or null
+    LogRepo-->>App: Current log
     
-    User->>App: Add meal from recipe
-    App->>RecipeService: getRecipes()
-    RecipeService->>DB: Fetch user recipes
-    DB-->>RecipeService: Recipe list
-    RecipeService-->>App: Available recipes
+    User->>App: Add from recipe
+    App->>RecipeRepo: getAll()
+    RecipeRepo-->>App: User's recipes
+    App->>User: Show recipes
     
-    User->>App: Select recipe
-    App->>RecipeService: getRecipeDetails(id)
-    RecipeService-->>App: Full recipe with ingredients
+    User->>App: Select recipe, 1.5 servings
     
-    User->>App: Set serving count (e.g., 1.5)
-    App->>App: Calculate meal macros
-    App->>User: Preview meal macros
+    App->>App: Calculate scaled macros
+    App->>App: Create meal with recipeId reference
     
-    User->>App: Confirm & log meal
-    App->>TrackingService: logMeal(recipeId, servings, mealType)
+    App->>LogRepo: addMeal(date, meal)
+    LogRepo->>LogRepo: Recalculate daily totals
+    LogRepo->>Cache: Update cache
+    Cache-->>LogRepo: Done
+    LogRepo-->>App: Success
     
-    TrackingService->>TrackingService: Create meal from recipe
-    TrackingService->>TrackingService: Calculate scaled macros
-    TrackingService->>TrackingService: Update daily totals
-    TrackingService->>DB: Save meal & update log
+    Note over LogRepo,FS: Background sync
+    LogRepo->>FS: setDoc(users/{uid}/dailyLogs/{date}, {merge: true})
     
-    DB-->>TrackingService: Saved
-    TrackingService-->>App: Updated daily log
-    App->>User: Show updated progress
+    App->>User: Updated progress
 ```
 
-### Daily Log Update Process
+### Daily Log Document with Recipe Reference
 
 ```mermaid
 flowchart TB
-    subgraph Input["New Meal Input"]
-        Recipe["Recipe Selected"]
-        Servings["Serving Count: 1.5"]
-        MealType["Meal Type: Lunch"]
+    subgraph DailyLogDoc["DailyLog Document (2024-01-15)"]
+        LogMeta["date: '2024-01-15'"]
+        
+        subgraph TotalMacros["totalMacros"]
+            TM["calories: 1850<br/>protein: 145<br/>carbs: 180<br/>fat: 62"]
+        end
+        
+        subgraph Meals["meals[]"]
+            subgraph Meal1["[0] Breakfast"]
+                M1_Foods["foods: [...]<br/>macros: {cal: 450...}"]
+            end
+            
+            subgraph Meal2["[1] Lunch (from Recipe)"]
+                M2_Meta["name: 'Lunch'<br/>recipeId: 'abc123'<br/>recipeServings: 1.5"]
+                M2_Foods["foods: [embedded from recipe]"]
+                M2_Macros["macros: {cal: 525...}"]
+            end
+            
+            subgraph Meal3["[2] Dinner"]
+                M3_Foods["foods: [...]"]
+            end
+        end
+        
+        TargetMacros["targetMacros: {cal: 2000...}"]
     end
-    
-    subgraph Process["Processing"]
-        CreateMeal["Create Meal Record"]
-        CalcMacros["Calculate Meal Macros"]
-        FetchLog["Fetch Daily Log"]
-        SumMeals["Sum All Meals"]
-        UpdateTotals["Update Daily Totals"]
-    end
-    
-    subgraph Output["Updated State"]
-        DailyLog["Daily Log"]
-        Progress["Macro Progress"]
-        Remaining["Remaining Macros"]
-    end
-    
-    Recipe --> CreateMeal
-    Servings --> CalcMacros
-    MealType --> CreateMeal
-    CreateMeal --> CalcMacros
-    CalcMacros --> FetchLog
-    FetchLog --> SumMeals
-    SumMeals --> UpdateTotals
-    UpdateTotals --> DailyLog
-    UpdateTotals --> Progress
-    UpdateTotals --> Remaining
 ```
 
 ## Recipe Scaling
 
-### Scaling Logic
+### Scaling for Different Serving Counts
 
 ```mermaid
 flowchart TB
-    subgraph Original["Original Recipe"]
-        OS["Original Servings: 4"]
-        OI["Ingredients at base quantities"]
-        OM["Macros per serving"]
+    subgraph Original["Original Recipe (4 servings)"]
+        O_Ing["Chicken: 400g<br/>Rice: 300g<br/>Vegetables: 200g"]
+        O_Macros["Total: 1400 cal<br/>Per serving: 350 cal"]
     end
     
-    subgraph Scale["Scale Factor"]
-        DS["Desired Servings: 6"]
-        SF["Scale Factor = 6/4 = 1.5"]
+    subgraph Scale["Scale to 6 servings"]
+        Factor["Factor = 6/4 = 1.5"]
     end
     
     subgraph Scaled["Scaled Recipe"]
-        SI["All ingredient quantities × 1.5"]
-        SM["Macros per serving unchanged"]
-        TM["Total macros × 1.5"]
+        S_Ing["Chicken: 600g<br/>Rice: 450g<br/>Vegetables: 300g"]
+        S_Macros["Total: 2100 cal<br/>Per serving: 350 cal<br/>(unchanged)"]
     end
     
-    OS --> SF
-    DS --> SF
-    SF --> SI
-    OI --> SI
-    OM --> SM
-    OM --> TM
-    SF --> TM
+    Original --> Scale
+    Scale --> Scaled
 ```
 
-### Scaling for Meal Prep
+### Meal Prep Workflow
 
 ```mermaid
 sequenceDiagram
     actor User
-    participant App as Mobile/Web App
-    participant RecipeService as Recipe Service
-    participant ShoppingService as Shopping Service
+    participant App as App
+    participant RecipeRepo as RecipeRepository
     
     User->>App: Open recipe for meal prep
-    App->>RecipeService: getRecipe(id)
-    RecipeService-->>App: Recipe details
+    App->>RecipeRepo: getById(recipeId)
+    RecipeRepo-->>App: Recipe (4 servings)
     
-    User->>App: Set prep quantity (e.g., 10 servings)
-    App->>App: Calculate scaled ingredients
-    App->>User: Show scaled ingredient list
+    User->>App: Scale to 12 servings (3x)
+    App->>App: Scale all ingredient quantities × 3
+    App->>User: Show scaled ingredients
     
     User->>App: Generate shopping list
-    App->>ShoppingService: createShoppingList(scaledIngredients)
-    ShoppingService->>ShoppingService: Aggregate ingredients
-    ShoppingService->>ShoppingService: Group by category
-    ShoppingService-->>App: Shopping list
+    App->>App: Aggregate ingredients by food
+    App->>App: Round to practical quantities
+    App->>User: Shopping list
     
-    App->>User: Display shopping list
+    Note over User,App: User can log individual<br/>servings throughout the week
 ```
 
-## Complete System Overview
+## Real-Time Sync with Firestore
 
-### End-to-End Data Flow
+### Subscription Pattern
+
+```mermaid
+sequenceDiagram
+    participant App as App
+    participant Repo as Repository
+    participant FS as Firestore
+    
+    App->>Repo: subscribe(callback)
+    Repo->>FS: onSnapshot(collection)
+    
+    FS-->>Repo: Initial data
+    Repo-->>App: callback(data)
+    
+    Note over FS: Another device<br/>makes changes
+    
+    FS-->>Repo: Updated data
+    Repo->>Repo: Update local cache
+    Repo-->>App: callback(newData)
+    
+    App->>Repo: unsubscribe()
+    Repo->>FS: Detach listener
+```
+
+### Multi-Device Sync
 
 ```mermaid
 flowchart TB
-    subgraph DataSources["Data Sources"]
-        USDA["USDA Database"]
-        OFF["Open Food Facts"]
-        Custom["Custom Foods"]
+    subgraph Device1["Mobile Device"]
+        App1["App"]
+        Cache1["Local Cache"]
     end
     
-    subgraph FoodLayer["Food Layer"]
-        FoodDB["Food Database"]
-        FoodCache["Local Food Cache"]
+    subgraph Cloud["Firebase"]
+        FS["Firestore"]
     end
     
-    subgraph RecipeLayer["Recipe Layer"]
-        RecipeDB["Recipe Database"]
-        RecipeCalc["Macro Calculator"]
+    subgraph Device2["Web Browser"]
+        App2["Web App"]
+        Cache2["Local Storage"]
     end
     
-    subgraph TrackingLayer["Tracking Layer"]
-        DailyLog["Daily Log"]
-        MealLog["Meal Log"]
-        MacroProgress["Macro Progress"]
-    end
+    App1 <-->|"onSnapshot"| FS
+    App2 <-->|"onSnapshot"| FS
     
-    subgraph UserInterface["User Interface"]
-        FoodSearch["Food Search"]
-        RecipeBuilder["Recipe Builder"]
-        MealTracker["Meal Tracker"]
-        Dashboard["Dashboard"]
-    end
-    
-    USDA --> FoodDB
-    OFF --> FoodDB
-    Custom --> FoodDB
-    FoodDB --> FoodCache
-    
-    FoodCache --> RecipeCalc
-    RecipeCalc --> RecipeDB
-    
-    RecipeDB --> MealLog
-    FoodCache --> MealLog
-    MealLog --> DailyLog
-    DailyLog --> MacroProgress
-    
-    FoodSearch --> FoodCache
-    RecipeBuilder --> RecipeDB
-    MealTracker --> MealLog
-    Dashboard --> MacroProgress
+    App1 --> Cache1
+    App2 --> Cache2
 ```
 
-### User Journey Map
+## Repository Implementation Examples
+
+### Base Repository Pattern
+
+```typescript
+// Base repository interface
+interface Repository<T> {
+  getById(id: string): Promise<T | null>;
+  getAll(): Promise<T[]>;
+  save(item: T): Promise<void>;
+  delete(id: string): Promise<void>;
+  subscribe(callback: (items: T[]) => void): () => void;
+}
+
+// Firestore path helper
+function getUserPath(userId: string, collection: string): string {
+  return `users/${userId}/${collection}`;
+}
+```
+
+### Recipe Repository Example
+
+```typescript
+// Recipe repository implementation
+class RecipeRepository implements Repository<Recipe> {
+  private userId: string;
+  private cache: Map<string, Recipe> = new Map();
+  
+  async getById(recipeId: string): Promise<Recipe | null> {
+    // Check cache first
+    if (this.cache.has(recipeId)) {
+      return this.cache.get(recipeId)!;
+    }
+    
+    // Fetch from Firestore
+    const docRef = doc(db, getUserPath(this.userId, 'recipes'), recipeId);
+    const snapshot = await getDoc(docRef);
+    
+    if (snapshot.exists()) {
+      const recipe = { id: snapshot.id, ...snapshot.data() } as Recipe;
+      this.cache.set(recipeId, recipe);
+      return recipe;
+    }
+    return null;
+  }
+  
+  async save(recipe: Recipe): Promise<void> {
+    // Update cache immediately (optimistic)
+    this.cache.set(recipe.id, recipe);
+    
+    // Calculate per-serving macros
+    const totalMacros = this.calculateTotalMacros(recipe.ingredients);
+    recipe.macros = {
+      calories: totalMacros.calories / recipe.servings,
+      protein: totalMacros.protein / recipe.servings,
+      carbs: totalMacros.carbs / recipe.servings,
+      fat: totalMacros.fat / recipe.servings,
+    };
+    
+    // Write to Firestore
+    const docRef = doc(db, getUserPath(this.userId, 'recipes'), recipe.id);
+    await setDoc(docRef, {
+      ...recipe,
+      updatedAt: Timestamp.now(),
+    });
+  }
+  
+  async addRecipeToMeal(
+    date: string, 
+    recipeId: string, 
+    servings: number,
+    mealName: string
+  ): Promise<void> {
+    const recipe = await this.getById(recipeId);
+    if (!recipe) throw new Error('Recipe not found');
+    
+    // Scale macros by serving count
+    const scaledMacros = {
+      calories: recipe.macros.calories * servings,
+      protein: recipe.macros.protein * servings,
+      carbs: recipe.macros.carbs * servings,
+      fat: recipe.macros.fat * servings,
+    };
+    
+    // Convert ingredients to meal foods
+    const foods: MealFood[] = recipe.ingredients.map(ing => ({
+      foodId: ing.foodId,
+      food: {
+        id: ing.foodId,
+        name: ing.foodName,
+        macros: {
+          calories: ing.calories,
+          protein: ing.protein,
+          carbs: ing.carbs,
+          fat: ing.fat,
+        },
+        servingSize: ing.servingSize,
+        servingUnit: ing.servingUnit,
+      },
+      quantity: ing.quantity * servings,
+      addedAt: new Date(),
+    }));
+    
+    // Create meal with recipe reference
+    const meal: Meal = {
+      id: generateId(),
+      name: mealName,
+      foods,
+      timestamp: new Date(),
+      macros: scaledMacros,
+      recipeId,
+      recipeServings: servings,
+    };
+    
+    // Add to daily log via DailyLogRepository
+    await dailyLogRepo.addMeal(date, meal);
+  }
+}
+```
+
+## Error Handling
+
+### Offline Error Recovery
 
 ```mermaid
-journey
-    title User Journey: From Food to Tracking
-    section Create Food
-      Search food database: 5: User
-      Select or create food: 4: User
-      Verify nutritional data: 3: User
-    section Build Recipe
-      Start new recipe: 5: User
-      Add ingredients: 4: User
-      Set quantities: 4: User
-      Calculate macros: 5: System
-      Save recipe: 5: User
-    section Track Meals
-      Open daily log: 5: User
-      Select recipe: 5: User
-      Choose serving size: 4: User
-      Log to meal: 5: User
-      View progress: 5: User
+flowchart TD
+    Action["User Action"] --> TryCache["Write to Cache"]
+    TryCache --> CacheOK{"Cache OK?"}
+    
+    CacheOK -->|Yes| TryFirestore["Write to Firestore"]
+    CacheOK -->|No| ShowError["Show Error"]
+    
+    TryFirestore --> FSOK{"Firestore OK?"}
+    
+    FSOK -->|Yes| Done["Success"]
+    FSOK -->|No| Queue["Queue for Retry"]
+    
+    Queue --> ShowOffline["Show Offline Indicator"]
+    ShowOffline --> WaitOnline["Wait for Connection"]
+    WaitOnline --> Retry["Retry Sync"]
+    Retry --> FSOK
 ```
 
-## API Endpoints
+### Error States
 
-### Food Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/foods/search?q={query}` | Search foods by name |
-| GET | `/foods/barcode/{code}` | Lookup food by barcode |
-| GET | `/foods/{id}` | Get food details |
-| POST | `/foods` | Create custom food |
-| PUT | `/foods/{id}` | Update custom food |
-| DELETE | `/foods/{id}` | Delete custom food |
-
-### Recipe Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/recipes` | List user's recipes |
-| GET | `/recipes/{id}` | Get recipe details |
-| POST | `/recipes` | Create new recipe |
-| PUT | `/recipes/{id}` | Update recipe |
-| DELETE | `/recipes/{id}` | Delete recipe |
-| POST | `/recipes/{id}/duplicate` | Duplicate recipe |
-| GET | `/recipes/public` | Browse public recipes |
-
-### Tracking Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/logs/{date}` | Get daily log |
-| POST | `/logs/{date}/meals` | Add meal to log |
-| PUT | `/logs/{date}/meals/{mealId}` | Update meal |
-| DELETE | `/logs/{date}/meals/{mealId}` | Remove meal |
-| POST | `/logs/{date}/meals/from-recipe` | Create meal from recipe |
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    
+    Idle --> Saving: User action
+    Saving --> Saved: Success
+    Saving --> CachedPending: Firestore offline
+    Saving --> Error: Cache failed
+    
+    CachedPending --> Syncing: Connection restored
+    Syncing --> Saved: Sync success
+    Syncing --> CachedPending: Sync failed
+    
+    Saved --> Idle: Done
+    Error --> Idle: Dismissed
+```
 
 ## Data Calculations
 
 ### Macro Calculation Formulas
 
-**Food Macros (per quantity):**
+**Ingredient Macros (scaled by quantity):**
 ```
-macros = food.macros × (quantity / food.servingSize)
+ingredientMacros = food.macros × quantity
 ```
 
-**Recipe Macros (per serving):**
+**Recipe Total Macros:**
 ```
-totalMacros = Σ(ingredient.food.macros × ingredient.quantity)
+totalMacros = Σ(ingredient.macros × ingredient.quantity)
+```
+
+**Recipe Per-Serving Macros:**
+```
 perServingMacros = totalMacros / recipe.servings
 ```
 
@@ -648,47 +957,27 @@ progress = (dailyTotalMacros / targetMacros) × 100
 remaining = targetMacros - dailyTotalMacros
 ```
 
-## Error Handling
+### Calorie Validation
 
-### Common Error States
+```
+expectedCalories = protein × 4 + carbs × 4 + fat × 9
+isValid = |actualCalories - expectedCalories| / expectedCalories < 0.10
+```
 
-```mermaid
-flowchart TD
-    subgraph FoodErrors["Food Errors"]
-        FE1["Food not found"]
-        FE2["Invalid barcode"]
-        FE3["Duplicate food"]
-        FE4["Invalid macro data"]
-    end
-    
-    subgraph RecipeErrors["Recipe Errors"]
-        RE1["No ingredients"]
-        RE2["Invalid serving count"]
-        RE3["Missing required fields"]
-        RE4["Circular reference"]
-    end
-    
-    subgraph TrackingErrors["Tracking Errors"]
-        TE1["Recipe not found"]
-        TE2["Invalid serving count"]
-        TE3["Log not found"]
-        TE4["Offline - queued"]
-    end
-    
-    FE1 --> CreateCustom["Prompt: Create custom food"]
-    FE2 --> ManualEntry["Prompt: Manual entry"]
-    FE3 --> Merge["Prompt: Merge or keep separate"]
-    FE4 --> Correct["Prompt: Correct values"]
-    
-    RE1 --> AddIngredient["Prompt: Add ingredients"]
-    RE2 --> FixServings["Default to 1 serving"]
-    RE3 --> ShowRequired["Highlight required fields"]
-    RE4 --> Block["Block save"]
-    
-    TE1 --> RefreshRecipes["Refresh recipe list"]
-    TE2 --> ResetServings["Reset to default"]
-    TE3 --> CreateLog["Create new log"]
-    TE4 --> QueueAction["Queue for sync"]
+## Security Rules
+
+Firestore security rules to protect user data:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can only access their own data
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
 ```
 
 ## Related Documentation
