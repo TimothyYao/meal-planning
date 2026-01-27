@@ -15,6 +15,10 @@ export interface FoodItem {
   macros: MacroTargets;
   servingSize: number; // in grams
   servingUnit: string; // "g", "ml", "piece", etc.
+  tags?: string[];
+  source?: string; // "USDA", "OpenFoodFacts", "user"
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface Meal {
@@ -23,6 +27,8 @@ export interface Meal {
   foods: MealFood[];
   timestamp: Date;
   macros: MacroTargets;
+  recipeId?: string; // Reference to the recipe if this meal was created from a recipe
+  recipeServings?: number; // Number of servings used from the recipe
 }
 
 export interface MealFood {
@@ -37,6 +43,39 @@ export interface DailyLog {
   meals: Meal[];
   totalMacros: MacroTargets;
   targetMacros: MacroTargets;
+  updatedAt?: Date;
+}
+
+/**
+ * An ingredient within a recipe. Structure mirrors MealFood for consistency.
+ */
+export interface RecipeIngredient {
+  foodId: string;
+  food: FoodItem; // Embedded snapshot for denormalization
+  quantity: number; // multiplier of servingSize
+  notes?: string; // e.g., "chopped", "diced"
+  addedAt?: Date;
+}
+
+/**
+ * Recipe with ingredients that can be reused for meal tracking.
+ * Per-serving macros are calculated from ingredients.
+ */
+export interface Recipe {
+  id: string;
+  name: string;
+  description?: string;
+  ingredients: RecipeIngredient[];
+  servings: number; // default serving count
+  macros: MacroTargets; // calculated per serving
+  prepTime?: number; // in minutes
+  cookTime?: number; // in minutes
+  tags?: string[];
+  imageUrl?: string;
+  isPublic?: boolean;
+  createdBy?: string; // user ID
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface UserProfile {
@@ -73,6 +112,56 @@ export function calculateMacros(foods: MealFood[]): MacroTargets {
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
+}
+
+/**
+ * Calculate total macros from recipe ingredients
+ */
+export function calculateRecipeIngredientsMacros(ingredients: RecipeIngredient[]): MacroTargets {
+  return ingredients.reduce(
+    (total, ingredient) => {
+      const multiplier = ingredient.quantity;
+      return {
+        calories: total.calories + ingredient.food.macros.calories * multiplier,
+        protein: total.protein + ingredient.food.macros.protein * multiplier,
+        carbs: total.carbs + ingredient.food.macros.carbs * multiplier,
+        fat: total.fat + ingredient.food.macros.fat * multiplier,
+      };
+    },
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+}
+
+/**
+ * Calculate per-serving macros for a recipe
+ */
+export function calculateRecipePerServingMacros(ingredients: RecipeIngredient[], servings: number): MacroTargets {
+  const totalMacros = calculateRecipeIngredientsMacros(ingredients);
+  return {
+    calories: totalMacros.calories / servings,
+    protein: totalMacros.protein / servings,
+    carbs: totalMacros.carbs / servings,
+    fat: totalMacros.fat / servings,
+  };
+}
+
+/**
+ * Scale macros by a multiplier (e.g., for serving count)
+ */
+export function scaleMacros(macros: MacroTargets, multiplier: number): MacroTargets {
+  return {
+    calories: macros.calories * multiplier,
+    protein: macros.protein * multiplier,
+    carbs: macros.carbs * multiplier,
+    fat: macros.fat * multiplier,
+  };
+}
+
+/**
+ * Create empty macros
+ */
+export function createEmptyMacros(): MacroTargets {
+  return { calories: 0, protein: 0, carbs: 0, fat: 0 };
 }
 
 export function formatMacroValue(value: number, unit: 'calories' | 'grams'): string {
@@ -163,4 +252,7 @@ export interface StorageAdapter {
 
 // Design tokens
 export * from './tokens';
+
+// Repositories
+export * from './repositories';
 
