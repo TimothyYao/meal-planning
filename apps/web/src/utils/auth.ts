@@ -12,6 +12,7 @@ import {
 import { auth } from '../config/firebase';
 import type { AuthUser } from '@meal-planning/shared';
 import { convertFirebaseUser as convertFirebaseUserShared } from '@meal-planning/shared';
+import { clearLocalCache } from './firestore';
 
 // Re-export AuthUser type for convenience
 export type { AuthUser };
@@ -121,10 +122,17 @@ export async function verifyPhoneCodeWeb(
 
 /**
  * Sign out the current user
+ * Also clears all local caches to ensure user data is properly cleaned up
  */
 export async function signOut(): Promise<void> {
   try {
+    // Sign out from Firebase first
     await firebaseSignOut(auth);
+    
+    // Clear all local caches to protect user privacy and ensure clean state
+    clearLocalCache();
+    
+    console.log('User signed out and all caches cleared');
   } catch (error) {
     console.error('Error signing out:', error);
     throw error;

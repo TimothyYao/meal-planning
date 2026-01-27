@@ -16,6 +16,9 @@ import { Platform } from 'react-native';
 import { auth } from '../config/firebase';
 import type { AuthUser } from '@meal-planning/shared';
 import { convertFirebaseUser as convertFirebaseUserShared } from '@meal-planning/shared';
+import { clearAllCaches, resetRepositories } from '../storage';
+import { clearUSDACache } from './usdaCache';
+import { clearOFFCache } from './offCache';
 
 // Complete the auth session for better UX
 WebBrowser.maybeCompleteAuthSession();
@@ -244,10 +247,25 @@ export async function verifyPhoneCode(
 
 /**
  * Sign out the current user
+ * Also clears all local caches to ensure user data is properly cleaned up
  */
 export async function signOut(): Promise<void> {
   try {
+    // Sign out from Firebase first
     await firebaseSignOut(auth);
+    
+    // Clear all local caches to protect user privacy and ensure clean state
+    // These operations are run in parallel for better performance
+    await Promise.all([
+      clearAllCaches(),
+      clearUSDACache(),
+      clearOFFCache(),
+    ]);
+    
+    // Reset repository singletons so they get recreated on next login
+    resetRepositories();
+    
+    console.log('User signed out and all caches cleared');
   } catch (error) {
     console.error('Error signing out:', error);
     throw error;
