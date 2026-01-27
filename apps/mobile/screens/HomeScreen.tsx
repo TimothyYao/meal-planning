@@ -174,6 +174,21 @@ export default function HomeScreen() {
     fat: 0,
   };
 
+  const remainingMacros = {
+    calories: targetMacros.calories - totalMacros.calories,
+    protein: targetMacros.protein - totalMacros.protein,
+    carbs: targetMacros.carbs - totalMacros.carbs,
+    fat: targetMacros.fat - totalMacros.fat,
+  };
+
+  const formatRemainingText = (remaining: number, unit: 'calories' | 'grams') => {
+    const formatted = formatMacroValue(Math.abs(remaining), unit);
+    if (remaining < 0) {
+      return `Over by ${formatted}`;
+    }
+    return `${formatted} remaining`;
+  };
+
   const getProgress = (current: number, target: number) => {
     if (target === 0) return 0;
     return Math.min((current / target) * 100, 100);
@@ -381,6 +396,14 @@ export default function HomeScreen() {
                   ]}
                 />
               </View>
+              <Text
+                style={[
+                  styles.remainingText,
+                  remainingMacros.calories < 0 && styles.remainingOverText,
+                ]}
+              >
+                {formatRemainingText(remainingMacros.calories, 'calories')}
+              </Text>
             </View>
             <View style={styles.macroRow}>
               <View style={styles.macroCard}>
@@ -412,6 +435,14 @@ export default function HomeScreen() {
                     ]}
                   />
                 </View>
+                <Text
+                  style={[
+                    styles.remainingText,
+                    remainingMacros.protein < 0 && styles.remainingOverText,
+                  ]}
+                >
+                  {formatRemainingText(remainingMacros.protein, 'grams')}
+                </Text>
               </View>
               <View style={styles.macroCard}>
                 <View style={styles.macroHeader}>
@@ -442,6 +473,14 @@ export default function HomeScreen() {
                     ]}
                   />
                 </View>
+                <Text
+                  style={[
+                    styles.remainingText,
+                    remainingMacros.carbs < 0 && styles.remainingOverText,
+                  ]}
+                >
+                  {formatRemainingText(remainingMacros.carbs, 'grams')}
+                </Text>
               </View>
               <View style={styles.macroCard}>
                 <View style={styles.macroHeader}>
@@ -472,6 +511,14 @@ export default function HomeScreen() {
                     ]}
                   />
                 </View>
+                <Text
+                  style={[
+                    styles.remainingText,
+                    remainingMacros.fat < 0 && styles.remainingOverText,
+                  ]}
+                >
+                  {formatRemainingText(remainingMacros.fat, 'grams')}
+                </Text>
               </View>
             </View>
           </View>
@@ -601,10 +648,14 @@ const styles = StyleSheet.create({
     color: fontColor.tertiary,
     fontWeight: '500',
   },
-  progressText: {
+  remainingText: {
     fontSize: fontSize.xs,
     color: fontColor.tertiary,
     marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  remainingOverText: {
+    color: colors.status.error,
   },
   progressBar: {
     width: '100%',
