@@ -97,22 +97,25 @@ jobs:
         if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
-      - name: Restore Expo and EAS caches
-        id: expo-cache
+      - name: Restore EAS CLI cache
+        id: eas-cli-cache
         uses: actions/cache/restore@v4
         with:
-          path: |
-            ~/.expo
-            ~/.eas
-            ~/.cache/expo
-            ~/.cache/metro
-          key: expo-eas-${{ runner.os }}-${{ hashFiles('package-lock.json', 'apps/mobile/package.json') }}
+          path: /opt/hostedtoolcache/eas-cli
+          key: eas-cli-${{ runner.os }}-v2
 
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Save EAS CLI cache
+        if: steps.eas-cli-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /opt/hostedtoolcache/eas-cli
+          key: eas-cli-${{ runner.os }}-v2
 
       - name: Create update
         working-directory: ./apps/mobile
@@ -125,17 +128,6 @@ jobs:
           EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
-
-      - name: Save Expo and EAS caches
-        if: steps.expo-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/.expo
-            ~/.eas
-            ~/.cache/expo
-            ~/.cache/metro
-          key: expo-eas-${{ runner.os }}-${{ hashFiles('package-lock.json', 'apps/mobile/package.json') }}
 
   update-preview:
     name: EAS Update (Preview)
@@ -192,22 +184,25 @@ jobs:
         if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
-      - name: Restore Expo and EAS caches
-        id: expo-cache
+      - name: Restore EAS CLI cache
+        id: eas-cli-cache
         uses: actions/cache/restore@v4
         with:
-          path: |
-            ~/.expo
-            ~/.eas
-            ~/.cache/expo
-            ~/.cache/metro
-          key: expo-eas-${{ runner.os }}-${{ hashFiles('package-lock.json', 'apps/mobile/package.json') }}
+          path: /opt/hostedtoolcache/eas-cli
+          key: eas-cli-${{ runner.os }}-v2
 
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Save EAS CLI cache
+        if: steps.eas-cli-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /opt/hostedtoolcache/eas-cli
+          key: eas-cli-${{ runner.os }}-v2
 
       - name: Create preview update
         working-directory: ./apps/mobile
@@ -220,14 +215,3 @@ jobs:
           EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
-
-      - name: Save Expo and EAS caches
-        if: steps.expo-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/.expo
-            ~/.eas
-            ~/.cache/expo
-            ~/.cache/metro
-          key: expo-eas-${{ runner.os }}-${{ hashFiles('package-lock.json', 'apps/mobile/package.json') }}
