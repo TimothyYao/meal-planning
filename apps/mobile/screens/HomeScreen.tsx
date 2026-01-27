@@ -1,13 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { DailyLog, formatMacroValue, MealFood, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
-import { getLogForDate, removeFoodFromDate, getUserTargetMacros } from '../storage';
-import FoodItem from '../components/FoodItem';
+import { getLogForDate, removeFoodFromDate, getUserTargetMacros, reorderFoodsInMeal } from '../storage';
+import DraggableFoodList from '../components/DraggableFoodList';
 import CalendarPicker from '../components/CalendarPicker';
 import { setRefreshHomeScreen } from '../App';
 
@@ -19,8 +17,6 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [userTargetMacros, setUserTargetMacros] = useState<{ calories: number; protein: number; carbs: number; fat: number } | null>(null);
-  const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
-  const currentOpenSwipeable = useRef<Swipeable | null>(null);
   
   // Animated values for progress bars
   const caloriesProgress = useRef(new Animated.Value(0)).current;
@@ -106,29 +102,7 @@ export default function HomeScreen() {
     setSelectedDate(date);
   };
 
-  const handleSwipeWillOpen = (swipeable: Swipeable) => {
-    // Close the currently open Swipeable if there is one
-    if (currentOpenSwipeable.current && currentOpenSwipeable.current !== swipeable) {
-      currentOpenSwipeable.current.close();
-    }
-    currentOpenSwipeable.current = swipeable;
-  };
-
-  const handleSwipeClose = () => {
-    currentOpenSwipeable.current = null;
-  };
-
-  const handleRemoveFood = async (mealId: string, foodIndex: number, foodName: string) => {
-    // Close all open Swipeables
-    if (currentOpenSwipeable.current) {
-      currentOpenSwipeable.current.close();
-      currentOpenSwipeable.current = null;
-    }
-    swipeableRefs.current.forEach((swipeable) => {
-      swipeable.close();
-    });
-    swipeableRefs.current.clear();
-
+  const handleRemoveFood = useCallback(async (mealId: string, foodIndex: number, foodName: string) => {
     const dateLabel = isToday(selectedDate) ? "today's" : "this day's";
     Alert.alert(
       'Remove Food',
@@ -151,7 +125,17 @@ export default function HomeScreen() {
         },
       ]
     );
-  };
+  }, [selectedDate, loadDateLog]);
+
+  const handleReorderFoods = useCallback(async (mealId: string, fromIndex: number, toIndex: number) => {
+    try {
+      const dateString = formatDateString(selectedDate);
+      await reorderFoodsInMeal(dateString, mealId, fromIndex, toIndex);
+      await loadDateLog(); // Refresh the log to show new order
+    } catch (error) {
+      console.error('Error reordering foods:', error);
+    }
+  }, [selectedDate, loadDateLog]);
 
   // Get target macros from log, or use user profile targets as fallback
   const targetMacros = selectedDateLog?.targetMacros || userTargetMacros || {
@@ -238,26 +222,41 @@ export default function HomeScreen() {
     });
   };
 
-  const calculateCaloriesFromMacros = (macros: { protein: number; carbs: number; fat: number }) => {
+  const calculateCaloriesFromMacros = useCallback((macros: { protein: number; carbs: number; fat: number }) => {
     return macros.protein * 4 + macros.carbs * 4 + macros.fat * 9;
-  };
+  }, []);
 
-  const handleScrollViewPress = () => {
-    if (currentOpenSwipeable.current) {
-      currentOpenSwipeable.current.close();
-      currentOpenSwipeable.current = null;
-    }
-  };
+  // Prepare food items for the draggable list
+  const foodItems = useMemo(() => {
+    if (!selectedDateLog || selectedDateLog.meals.length === 0) return [];
+    
+    return selectedDateLog.meals.flatMap(meal =>
+      meal.foods.map((mealFood, index) => ({
+        mealFood,
+        mealId: meal.id,
+        index,
+        key: `${meal.id}-${mealFood.food.id}-${index}`,
+      }))
+    );
+  }, [selectedDateLog]);
+
+  const handleItemPress = useCallback((item: { mealFood: MealFood; mealId: string; index: number }) => {
+    (navigation as any).navigate('FoodDetail', {
+      mealId: item.mealId,
+      foodIndex: item.index,
+      date: formatDateString(selectedDate),
+      mealFood: item.mealFood,
+    });
+  }, [navigation, selectedDate]);
+
+  const handleItemRemove = useCallback((item: { mealFood: MealFood; mealId: string; index: number }) => {
+    handleRemoveFood(item.mealId, item.index, item.mealFood.food.name);
+  }, [handleRemoveFood]);
 
   return (
     <ScrollView 
       style={styles.container} 
       contentContainerStyle={[styles.content, { paddingTop: insets.top }]}
-      onStartShouldSetResponder={() => {
-        handleScrollViewPress();
-        return false;
-      }}
-      onScrollBeginDrag={handleScrollViewPress}
     >
       <Text style={styles.title}>
         {isToday(selectedDate) ? "Today's Macros" : "Macros"}
@@ -436,54 +435,23 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {selectedDateLog && selectedDateLog.meals.length > 0 && (
+          {foodItems.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
                 {isToday(selectedDate) ? "Today's Foods" : "Foods"}
               </Text>
-              {selectedDateLog.meals.map(meal =>
-                meal.foods.map((mealFood, index) => {
-                  const itemKey = `${meal.id}-${mealFood.food.id}-${index}`;
-                  return (
-                    <FoodItem
-                      key={itemKey}
-                      mealFood={mealFood}
-                      mealId={meal.id}
-                      index={index}
-                      totalItems={meal.foods.length}
-                      onPress={() => {
-                        // If any swipeable is open, close it instead of navigating
-                        if (currentOpenSwipeable.current) {
-                          currentOpenSwipeable.current.close();
-                          currentOpenSwipeable.current = null;
-                          return;
-                        }
-                        // Otherwise navigate normally
-                        // Pass the mealFood directly since it's the log entry we want to show
-                        (navigation as any).navigate('FoodDetail', {
-                          mealId: meal.id,
-                          foodIndex: index,
-                          date: formatDateString(selectedDate),
-                          mealFood: mealFood, // Pass the full mealFood to avoid loading from log
-                        });
-                      }}
-                      onRemove={() => handleRemoveFood(meal.id, index, mealFood.food.name)}
-                      onSwipeableRef={(ref) => {
-                        if (ref) {
-                          swipeableRefs.current.set(itemKey, ref);
-                        } else {
-                          swipeableRefs.current.delete(itemKey);
-                        }
-                      }}
-                      onSwipeWillOpen={handleSwipeWillOpen}
-                      onSwipeClose={handleSwipeClose}
-                      formatServingInfo={formatServingInfo}
-                      formatTime={formatTime}
-                      calculateCaloriesFromMacros={calculateCaloriesFromMacros}
-                    />
-                  );
-                })
-              )}
+              <Text style={styles.reorderHint}>
+                Hold and drag to reorder
+              </Text>
+              <DraggableFoodList
+                items={foodItems}
+                onItemPress={handleItemPress}
+                onItemRemove={handleItemRemove}
+                onReorder={handleReorderFoods}
+                formatServingInfo={formatServingInfo}
+                formatTime={formatTime}
+                calculateCaloriesFromMacros={calculateCaloriesFromMacros}
+              />
             </View>
           )}
         </>
@@ -536,7 +504,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: fontSize.xl,
     fontWeight: '600',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  reorderHint: {
+    fontSize: fontSize.xs,
+    color: fontColor.quaternary,
+    marginBottom: spacing.md,
   },
   macroRow: {
     flexDirection: 'row',

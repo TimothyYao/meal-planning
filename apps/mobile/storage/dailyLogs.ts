@@ -390,20 +390,19 @@ export async function getLogForDate(date: string): Promise<DailyLog | null> {
 }
 
 /**
- * Reorder foods in a meal
+ * Reorder foods in a meal for a specific date
  */
-export async function reorderFoodsInMeal(mealId: string, fromIndex: number, toIndex: number): Promise<void> {
+export async function reorderFoodsInMeal(date: string, mealId: string, fromIndex: number, toIndex: number): Promise<void> {
   try {
-    const today = getTodayDate();
     const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
     const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
     
-    const todayLog = logs[today];
-    if (!todayLog) return;
+    const dateLog = logs[date];
+    if (!dateLog) return;
     
-    const mealIndex = todayLog.meals.findIndex((m: any) => m.id === mealId);
-    if (mealIndex >= 0 && todayLog.meals[mealIndex].foods[fromIndex] && todayLog.meals[mealIndex].foods[toIndex] !== undefined) {
-      const meal = todayLog.meals[mealIndex];
+    const mealIndex = dateLog.meals.findIndex((m: any) => m.id === mealId);
+    if (mealIndex >= 0 && dateLog.meals[mealIndex].foods[fromIndex] && dateLog.meals[mealIndex].foods[toIndex] !== undefined) {
+      const meal = dateLog.meals[mealIndex];
       const [movedFood] = meal.foods.splice(fromIndex, 1);
       meal.foods.splice(toIndex, 0, movedFood);
       
@@ -411,14 +410,35 @@ export async function reorderFoodsInMeal(mealId: string, fromIndex: number, toIn
       meal.macros = calculateMacros(meal.foods);
       
       // Recalculate total macros for the day
-      const allMealFoods: MealFood[] = todayLog.meals.flatMap((meal: any) => meal.foods);
-      todayLog.totalMacros = calculateMacros(allMealFoods);
+      const allMealFoods: MealFood[] = dateLog.meals.flatMap((m: Meal) => m.foods);
+      dateLog.totalMacros = calculateMacros(allMealFoods);
       
       // Convert Date objects to ISO strings for storage
-      const logToSave = serializeDailyLog(todayLog as DailyLog);
+      const logToSave = serializeDailyLog(dateLog as DailyLog);
       
-      logs[today] = logToSave;
+      logs[date] = logToSave;
       await AsyncStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
+      
+      // If authenticated, also save to Firestore (async, non-blocking)
+      const user = getCurrentUser();
+      if (user) {
+        const dailyLog: DailyLog = {
+          date: logToSave.date,
+          meals: logToSave.meals.map((meal: any) => ({
+            ...meal,
+            timestamp: typeof meal.timestamp === 'string' ? new Date(meal.timestamp) : meal.timestamp,
+            foods: meal.foods.map((mealFood: any) => ({
+              ...mealFood,
+              addedAt: typeof mealFood.addedAt === 'string' ? new Date(mealFood.addedAt) : mealFood.addedAt,
+            })),
+          })),
+          totalMacros: logToSave.totalMacros,
+          targetMacros: logToSave.targetMacros,
+        };
+        saveDailyLogToFirestore(dailyLog).catch((error) => {
+          console.error('Error saving reordered daily log to Firestore:', error);
+        });
+      }
     }
   } catch (error) {
     console.error('Error reordering foods:', error);
