@@ -1,23 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  ActivityIndicator,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import {
   FoodItem,
   RecipeIngredient,
   calculateRecipePerServingMacros,
   createEmptyMacros,
-  formatMacroValue,
   spacing,
   fontSize,
   fontColor,
@@ -26,6 +14,11 @@ import {
 import { getRecentFoods, getRecipeRepository } from '../storage';
 import { mobileRepositoryContext } from '../storage/adapters/RepositoryContext';
 import { NumberEditor } from '../components/NumberEditor';
+import RecipeBasicsForm from '../components/recipes/RecipeBasicsForm';
+import RecipeIngredientsSection from '../components/recipes/RecipeIngredientsSection';
+import RecipeMacrosSummary from '../components/recipes/RecipeMacrosSummary';
+import RecipeFoodPickerModal from '../components/recipes/RecipeFoodPickerModal';
+import RecipeSaveBar from '../components/recipes/RecipeSaveBar';
 
 const MAX_RECENT_FOODS = 50;
 
@@ -189,189 +182,39 @@ export default function RecipeBuilderScreen() {
           Combine your foods into reusable recipes for quick logging.
         </Text>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Recipe name *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., Chicken Stir Fry"
-            placeholderTextColor={fontColor.tertiary}
-            value={name}
-            onChangeText={setName}
-          />
-        </View>
+        <RecipeBasicsForm
+          name={name}
+          description={description}
+          servings={servings}
+          onNameChange={setName}
+          onDescriptionChange={setDescription}
+          onServingsChange={setServings}
+        />
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Optional notes or steps"
-            placeholderTextColor={fontColor.tertiary}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            textAlignVertical="top"
-          />
-        </View>
+        <RecipeIngredientsSection
+          ingredients={ingredients}
+          onAddIngredient={handleOpenFoodPicker}
+          onRemoveIngredient={handleRemoveIngredient}
+        />
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Servings *</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={servings}
-            onChangeText={setServings}
-            placeholder="1"
-            placeholderTextColor={fontColor.tertiary}
-          />
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Ingredients</Text>
-            <TouchableOpacity style={styles.addButton} onPress={handleOpenFoodPicker}>
-              <Ionicons name="add" size={18} color={fontColor.inverse} />
-              <Text style={styles.addButtonText}>Add</Text>
-            </TouchableOpacity>
-          </View>
-
-          {ingredients.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="restaurant-outline" size={32} color={fontColor.tertiary} />
-              <Text style={styles.emptyTitle}>No ingredients yet</Text>
-              <Text style={styles.emptySubtitle}>
-                Add foods you have logged recently to build this recipe.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.ingredientList}>
-              {ingredients.map((ingredient) => (
-                <View key={ingredient.foodId} style={styles.ingredientRow}>
-                  <View style={styles.ingredientInfo}>
-                    <Text style={styles.ingredientName}>{ingredient.food.name}</Text>
-                    <Text style={styles.ingredientMeta}>
-                      {ingredient.quantity} x {ingredient.food.servingSize} {ingredient.food.servingUnit}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => handleRemoveIngredient(ingredient.foodId)}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={fontColor.tertiary} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Macros per serving</Text>
-          <View style={styles.macroGrid}>
-            <View style={styles.macroCard}>
-              <Text style={styles.macroLabel}>Calories</Text>
-              <Text style={styles.macroValue}>
-                {formatMacroValue(perServingMacros.calories, 'calories')}
-              </Text>
-            </View>
-            <View style={styles.macroCard}>
-              <Text style={styles.macroLabel}>Protein</Text>
-              <Text style={styles.macroValue}>
-                {formatMacroValue(perServingMacros.protein, 'grams')}
-              </Text>
-            </View>
-            <View style={styles.macroCard}>
-              <Text style={styles.macroLabel}>Carbs</Text>
-              <Text style={styles.macroValue}>
-                {formatMacroValue(perServingMacros.carbs, 'grams')}
-              </Text>
-            </View>
-            <View style={styles.macroCard}>
-              <Text style={styles.macroLabel}>Fat</Text>
-              <Text style={styles.macroValue}>
-                {formatMacroValue(perServingMacros.fat, 'grams')}
-              </Text>
-            </View>
-          </View>
-        </View>
+        <RecipeMacrosSummary macros={perServingMacros} />
       </ScrollView>
 
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + spacing.xl }]}>
-        <TouchableOpacity
-          style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-          onPress={handleSaveRecipe}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator color={fontColor.inverse} />
-          ) : (
-            <Text style={styles.saveButtonText}>Save Recipe</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <RecipeSaveBar
+        isSaving={isSaving}
+        bottomInset={insets.bottom}
+        onSave={handleSaveRecipe}
+      />
 
-      <Modal
+      <RecipeFoodPickerModal
         visible={foodPickerVisible}
-        animationType="slide"
-        onRequestClose={() => setFoodPickerVisible(false)}
-      >
-        <View style={[styles.modalContainer, { paddingTop: insets.top + spacing.md }]}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity
-              onPress={() => setFoodPickerVisible(false)}
-              style={styles.modalCloseButton}
-            >
-              <Ionicons name="close" size={26} color={fontColor.secondary} />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Select ingredient</Text>
-            <View style={styles.modalHeaderSpacer} />
-          </View>
-
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={18} color={fontColor.tertiary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search recent foods"
-              placeholderTextColor={fontColor.tertiary}
-              value={foodSearch}
-              onChangeText={setFoodSearch}
-            />
-          </View>
-
-          {isLoadingFoods ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : filteredFoods.length === 0 ? (
-            <View style={styles.emptyFoods}>
-              <Ionicons name="time-outline" size={32} color={fontColor.tertiary} />
-              <Text style={styles.emptyTitle}>No recent foods</Text>
-              <Text style={styles.emptySubtitle}>
-                Add foods from the Add Food tab to build recipes here.
-              </Text>
-            </View>
-          ) : (
-            <ScrollView contentContainerStyle={styles.foodList}>
-              {filteredFoods.map((food) => (
-                <TouchableOpacity
-                  key={food.id}
-                  style={styles.foodItem}
-                  onPress={() => handleSelectFood(food)}
-                >
-                  <View style={styles.foodInfo}>
-                    <Text style={styles.foodName}>{food.name}</Text>
-                    {food.brand && <Text style={styles.foodBrand}>{food.brand}</Text>}
-                    <Text style={styles.foodMacros}>
-                      {Math.round(food.macros.calories)} cal • {food.macros.protein}g P •{' '}
-                      {food.macros.carbs}g C • {food.macros.fat}g F
-                    </Text>
-                  </View>
-                  <Ionicons name="add-circle" size={22} color={colors.primary} />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </View>
-      </Modal>
+        foods={filteredFoods}
+        isLoading={isLoadingFoods}
+        searchQuery={foodSearch}
+        onSearchChange={setFoodSearch}
+        onSelectFood={handleSelectFood}
+        onClose={() => setFoodPickerVisible(false)}
+      />
 
       <NumberEditor
         visible={quantityEditorVisible}
@@ -413,237 +256,5 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     color: fontColor.tertiary,
     marginBottom: spacing.xl,
-  },
-  section: {
-    marginBottom: spacing.xl,
-  },
-  sectionTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: '600',
-    color: fontColor.primary,
-    marginBottom: spacing.md,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  label: {
-    fontSize: fontSize.base,
-    fontWeight: '500',
-    color: fontColor.primary,
-    marginBottom: spacing.sm,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border.medium,
-    borderRadius: 10,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    fontSize: fontSize.base,
-    backgroundColor: colors.background.secondary,
-    color: fontColor.primary,
-  },
-  textArea: {
-    minHeight: 90,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
-  },
-  addButtonText: {
-    color: fontColor.inverse,
-    fontWeight: '600',
-    marginLeft: spacing.xs,
-  },
-  ingredientList: {
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-    backgroundColor: colors.background.secondary,
-  },
-  ingredientInfo: {
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  ingredientName: {
-    fontSize: fontSize.base,
-    fontWeight: '500',
-    color: fontColor.primary,
-  },
-  ingredientMeta: {
-    fontSize: fontSize.sm,
-    color: fontColor.tertiary,
-    marginTop: spacing.xs,
-  },
-  removeButton: {
-    padding: spacing.xs,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.border.light,
-    borderRadius: 12,
-    backgroundColor: colors.background.secondary,
-  },
-  emptyTitle: {
-    fontSize: fontSize.base,
-    fontWeight: '600',
-    color: fontColor.secondary,
-    marginTop: spacing.sm,
-  },
-  emptySubtitle: {
-    fontSize: fontSize.sm,
-    color: fontColor.tertiary,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-  },
-  macroGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  macroCard: {
-    flexBasis: '48%',
-    backgroundColor: colors.background.secondary,
-    borderRadius: 12,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  macroLabel: {
-    fontSize: fontSize.sm,
-    color: fontColor.tertiary,
-    marginBottom: spacing.xs,
-  },
-  macroValue: {
-    fontSize: fontSize.lg,
-    fontWeight: '600',
-    color: fontColor.primary,
-  },
-  bottomBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    backgroundColor: colors.background.primary,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
-  saveButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.lg,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: fontColor.inverse,
-    fontSize: fontSize.lg,
-    fontWeight: '600',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.md,
-  },
-  modalCloseButton: {
-    padding: spacing.sm,
-  },
-  modalTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: '600',
-    color: fontColor.secondary,
-  },
-  modalHeaderSpacer: {
-    width: 40,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.background.secondary,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: fontSize.base,
-    paddingVertical: spacing.sm,
-    marginLeft: spacing.sm,
-    color: fontColor.primary,
-  },
-  foodList: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
-  },
-  foodItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  foodInfo: {
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  foodName: {
-    fontSize: fontSize.base,
-    fontWeight: '500',
-    color: fontColor.primary,
-    marginBottom: 2,
-  },
-  foodBrand: {
-    fontSize: fontSize.sm,
-    color: fontColor.tertiary,
-    marginBottom: 2,
-  },
-  foodMacros: {
-    fontSize: fontSize.sm,
-    color: fontColor.tertiary,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyFoods: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
   },
 });
