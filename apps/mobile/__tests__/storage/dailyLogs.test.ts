@@ -283,7 +283,6 @@ describe('Daily Logs Storage', () => {
               name: 'Meal',
               foods: [
                 {
-                  foodId: 'food-123',
                   food: sampleFood,
                   quantity: 1,
                   addedAt: '2024-06-14T10:00:00.000Z',
@@ -304,7 +303,6 @@ describe('Daily Logs Storage', () => {
               name: 'Meal',
               foods: [
                 {
-                  foodId: 'food-456',
                   food: sampleFood2,
                   quantity: 1,
                   addedAt: '2024-06-15T12:00:00.000Z',

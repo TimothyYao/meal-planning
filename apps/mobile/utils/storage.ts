@@ -54,7 +54,7 @@ export async function saveFood(food: FoodItem): Promise<void> {
               
               // Update any MealFood entries that reference this food
               for (const mealFood of meal.foods) {
-                if (mealFood.foodId === food.id || mealFood.food?.id === food.id) {
+                if (mealFood.food?.id === food.id) {
                   mealFood.food = food;
                   mealUpdated = true;
                   dayUpdated = true;
@@ -151,7 +151,6 @@ export async function addFoodToDate(food: FoodItem, quantity: number = 1, date: 
     
     // Create a meal food entry
     const mealFood: MealFood = {
-      foodId: food.id,
       food,
       quantity,
       addedAt: new Date(),

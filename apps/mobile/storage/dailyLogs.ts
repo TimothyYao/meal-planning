@@ -59,7 +59,7 @@ function areLogsDifferent(log1: DailyLog, log2: DailyLog): boolean {
       const food2 = meal2.foods[j];
       
       if (
-        food1.foodId !== food2.foodId ||
+        food1.food.id !== food2.food.id ||
         food1.quantity !== food2.quantity
       ) {
         return true;
@@ -172,10 +172,8 @@ export async function addFoodToDate(food: FoodItem, quantity: number = 1, date: 
       };
     }
     
-    // Create a meal food entry with a unique ID
+    // Create a meal food entry with embedded food snapshot
     const mealFood: MealFood = {
-      id: await generateFoodId(), // unique ID for this log entry
-      foodId: food.id,
       food,
       quantity,
       addedAt: new Date(),

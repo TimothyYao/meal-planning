@@ -261,8 +261,6 @@ export class DailyLogRepository implements IDailyLogRepository {
 
     // Convert recipe ingredients to meal foods
     const foods: MealFood[] = recipe.ingredients.map((ing) => ({
-      id: this.context.generateId(), // unique ID for each log entry
-      foodId: ing.foodId,
       food: ing.food,
       quantity: ing.quantity * servings,
       addedAt: new Date(),
