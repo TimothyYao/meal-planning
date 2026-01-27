@@ -95,7 +95,6 @@ describe('firestore integration (mocked firebase)', () => {
           name: 'Breakfast',
           foods: [
             {
-              foodId: sampleFood.id,
               food: sampleFood,
               quantity: 1,
               addedAt: addedAtTimestamp as unknown as Date,
@@ -144,7 +143,6 @@ describe('firestore integration (mocked firebase)', () => {
             name: 'Lunch',
             foods: [
               {
-                foodId: sampleFood.id,
                 food: sampleFood,
                 quantity: 1,
                 addedAt: new Date('2024-01-01T12:00:00Z'),

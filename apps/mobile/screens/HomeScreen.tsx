@@ -116,14 +116,21 @@ export default function HomeScreen() {
             try {
               const dateString = formatDateString(selectedDate);
               
-              // Find the current index of this item in the meal by its unique ID
+              // Find the current index of this item in the meal by its addedAt timestamp
               const meal = selectedDateLog?.meals.find(m => m.id === mealId);
               if (!meal) {
                 console.error('Meal not found');
                 return;
               }
               
-              const currentIndex = meal.foods.findIndex(f => f.id === mealFood.id);
+              const currentIndex = meal.foods.findIndex(f => {
+                // Match by addedAt timestamp (unique per entry)
+                if (mealFood.addedAt && f.addedAt) {
+                  return f.addedAt.getTime() === mealFood.addedAt.getTime();
+                }
+                // Fallback: match by food.id and quantity
+                return f.food.id === mealFood.food.id && f.quantity === mealFood.quantity;
+              });
               
               if (currentIndex === -1) {
                 console.error('Food not found in meal');
@@ -246,23 +253,30 @@ export default function HomeScreen() {
     if (!selectedDateLog || selectedDateLog.meals.length === 0) return [];
     
     return selectedDateLog.meals.flatMap(meal =>
-      meal.foods.map((mealFood, index) => ({
-        mealFood,
-        mealId: meal.id,
-        index,
-        // Use the mealFood's unique ID for the key
-        key: mealFood.id || `${meal.id}-${index}`,
-      }))
+      meal.foods.map((mealFood, index) => {
+        // Use addedAt timestamp for unique key since each entry has a unique timestamp
+        const uniqueId = mealFood.addedAt 
+          ? mealFood.addedAt.getTime().toString() 
+          : `${index}`;
+        return {
+          mealFood,
+          mealId: meal.id,
+          index,
+          key: `${meal.id}-${uniqueId}`,
+        };
+      })
     );
   }, [selectedDateLog]);
 
   const handleItemPress = useCallback((item: { mealFood: MealFood; mealId: string; index: number }) => {
-    // Find the current index of this item in the meal by its unique ID
+    // Find the current index of this item in the meal by its addedAt timestamp
     const meal = selectedDateLog?.meals.find(m => m.id === item.mealId);
     let currentIndex = item.index;
     
-    if (meal && item.mealFood.id) {
-      const foundIndex = meal.foods.findIndex(f => f.id === item.mealFood.id);
+    if (meal && item.mealFood.addedAt) {
+      const foundIndex = meal.foods.findIndex(f => 
+        f.addedAt && f.addedAt.getTime() === item.mealFood.addedAt!.getTime()
+      );
       if (foundIndex !== -1) {
         currentIndex = foundIndex;
       }

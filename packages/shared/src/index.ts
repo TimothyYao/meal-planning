@@ -32,9 +32,7 @@ export interface Meal {
 }
 
 export interface MealFood {
-  id: string; // unique identifier for this log entry
-  foodId: string;
-  food: FoodItem;
+  food: FoodItem; // embedded snapshot of the food
   quantity: number; // multiplier of servingSize
   addedAt?: Date; // timestamp when food was added to the meal
 }

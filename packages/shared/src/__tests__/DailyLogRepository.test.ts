@@ -32,16 +32,12 @@ describe('DailyLogRepository', () => {
 
   // Sample meal foods
   const chickenMealFood: MealFood = {
-    id: 'mealfood-chicken-1',
-    foodId: 'food-chicken',
     food: chickenFood,
     quantity: 1,
     addedAt: new Date('2024-01-15T12:00:00.000Z'),
   };
 
   const riceMealFood: MealFood = {
-    id: 'mealfood-rice-1',
-    foodId: 'food-rice',
     food: riceFood,
     quantity: 1.5,
     addedAt: new Date('2024-01-15T12:05:00.000Z'),
