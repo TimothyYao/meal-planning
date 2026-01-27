@@ -102,7 +102,7 @@ export default function HomeScreen() {
     setSelectedDate(date);
   };
 
-  const handleRemoveFood = useCallback(async (mealId: string, foodIndex: number, foodName: string) => {
+  const handleRemoveFood = useCallback(async (mealId: string, mealFood: MealFood, foodName: string) => {
     const dateLabel = isToday(selectedDate) ? "today's" : "this day's";
     Alert.alert(
       'Remove Food',
@@ -115,7 +115,30 @@ export default function HomeScreen() {
           onPress: async () => {
             try {
               const dateString = formatDateString(selectedDate);
-              await removeFoodFromDate(dateString, mealId, foodIndex);
+              
+              // Find the current index of this item in the meal
+              // We need to match by addedAt timestamp since that's unique per entry
+              const meal = selectedDateLog?.meals.find(m => m.id === mealId);
+              if (!meal) {
+                console.error('Meal not found');
+                return;
+              }
+              
+              const currentIndex = meal.foods.findIndex(f => {
+                // Match by addedAt timestamp if available
+                if (mealFood.addedAt && f.addedAt) {
+                  return f.addedAt.getTime() === mealFood.addedAt.getTime();
+                }
+                // Fallback: match by foodId and quantity (less reliable for duplicates)
+                return f.foodId === mealFood.foodId && f.quantity === mealFood.quantity;
+              });
+              
+              if (currentIndex === -1) {
+                console.error('Food not found in meal');
+                return;
+              }
+              
+              await removeFoodFromDate(dateString, mealId, currentIndex);
               await loadDateLog(); // Refresh the log
             } catch (error) {
               console.error('Error removing food:', error);
@@ -125,7 +148,7 @@ export default function HomeScreen() {
         },
       ]
     );
-  }, [selectedDate, loadDateLog]);
+  }, [selectedDate, selectedDateLog, loadDateLog]);
 
   const handleReorderFoods = useCallback(async (mealId: string, fromIndex: number, toIndex: number) => {
     try {
@@ -231,26 +254,49 @@ export default function HomeScreen() {
     if (!selectedDateLog || selectedDateLog.meals.length === 0) return [];
     
     return selectedDateLog.meals.flatMap(meal =>
-      meal.foods.map((mealFood, index) => ({
-        mealFood,
-        mealId: meal.id,
-        index,
-        key: `${meal.id}-${mealFood.food.id}-${index}`,
-      }))
+      meal.foods.map((mealFood, index) => {
+        // Use addedAt timestamp for unique key if available, otherwise fall back to index
+        // This ensures duplicated foods have unique keys
+        const uniqueId = mealFood.addedAt 
+          ? mealFood.addedAt.getTime().toString() 
+          : `${index}-${Date.now()}`;
+        return {
+          mealFood,
+          mealId: meal.id,
+          index,
+          key: `${meal.id}-${uniqueId}`,
+        };
+      })
     );
   }, [selectedDateLog]);
 
   const handleItemPress = useCallback((item: { mealFood: MealFood; mealId: string; index: number }) => {
+    // Find the current index of this item in the meal
+    const meal = selectedDateLog?.meals.find(m => m.id === item.mealId);
+    let currentIndex = item.index;
+    
+    if (meal) {
+      const foundIndex = meal.foods.findIndex(f => {
+        if (item.mealFood.addedAt && f.addedAt) {
+          return f.addedAt.getTime() === item.mealFood.addedAt.getTime();
+        }
+        return f.foodId === item.mealFood.foodId && f.quantity === item.mealFood.quantity;
+      });
+      if (foundIndex !== -1) {
+        currentIndex = foundIndex;
+      }
+    }
+    
     (navigation as any).navigate('FoodDetail', {
       mealId: item.mealId,
-      foodIndex: item.index,
+      foodIndex: currentIndex,
       date: formatDateString(selectedDate),
       mealFood: item.mealFood,
     });
-  }, [navigation, selectedDate]);
+  }, [navigation, selectedDate, selectedDateLog]);
 
   const handleItemRemove = useCallback((item: { mealFood: MealFood; mealId: string; index: number }) => {
-    handleRemoveFood(item.mealId, item.index, item.mealFood.food.name);
+    handleRemoveFood(item.mealId, item.mealFood, item.mealFood.food.name);
   }, [handleRemoveFood]);
 
   return (
