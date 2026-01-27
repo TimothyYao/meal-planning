@@ -4,7 +4,7 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect, useIsFocused, Navig
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { MealFood, spacing, fontSize, fontColor, colors, deserializeDailyLog } from '@meal-planning/shared';
-import { saveFood, addFoodToDate, generateFoodId, getTodayDate, getLogForDate } from '../storage';
+import { addFoodToDate, getTodayDate, getLogForDate } from '../storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DAILY_LOGS_KEY } from '../storage/constants';
 import { safeGoBack } from '../utils/navigation';
@@ -183,25 +183,13 @@ export default function FoodDetailScreen() {
       const food = mealFood.food;
       console.log('Starting copy operation for food:', food.name);
       
-      // Create a copy of the food item with a new UUID
-      const newId = await generateFoodId();
-      const copiedFood = {
-        ...food,
-        id: newId,
-      };
-      
-      console.log('Created copied food with new ID:', newId);
-
-      // Save the copied food to the database (cache first, then Firebase)
-      await saveFood(copiedFood);
-      console.log('Saved copied food to cache');
-
-      // Add to today's log with the same quantity
+      // Add the same food to today's log with the same quantity
+      // Each log entry gets a unique addedAt timestamp, so no new food ID needed
       const targetDate = getTodayDate();
-      await addFoodToDate(copiedFood, mealFood.quantity, targetDate);
-      console.log(`Added copied food to ${targetDate}'s log`);
+      await addFoodToDate(food, mealFood.quantity, targetDate);
+      console.log(`Added ${food.name} to ${targetDate}'s log`);
 
-      Alert.alert('Success', `Copied ${food.name} and added to today's log`, [
+      Alert.alert('Success', `Added ${food.name} to today's log`, [
         {
           text: 'OK',
           onPress: () => {
