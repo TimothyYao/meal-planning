@@ -3,15 +3,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useRef, useState } from 'react';
 import { FoodItem, spacing, fontSize, fontColor, colors } from '@meal-planning/shared';
-import { getFoodById, updateFoodInLogEntry, moveFoodToDate } from '../storage';
+import { updateFoodInLogEntry, moveFoodToDate } from '../storage';
 import FoodForm, { FoodFormRef } from '../components/FoodForm';
 import { safeGoBack } from '../utils/navigation';
 
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-
 type EditFoodRouteParams = {
-  foodId: string;
+  food: FoodItem; // Food data passed directly (no database lookup needed)
   mealId: string; // Required - must be editing a log entry
   foodIndex: number; // Required - must be editing a log entry
   date: string; // Required - YYYY-MM-DD format
@@ -24,27 +21,10 @@ export default function EditFoodScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const route = useRoute<EditFoodRouteProp>();
-  const { foodId, mealId, foodIndex, date, quantity: initialQuantity = 1 } = route.params;
-  const [food, setFood] = useState<FoodItem | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { food, mealId, foodIndex, date, quantity: initialQuantity = 1 } = route.params;
   const [currentQuantity, setCurrentQuantity] = useState(initialQuantity);
   const [isSaving, setIsSaving] = useState(false);
   const formRef = useRef<FoodFormRef>(null);
-
-  // Load food data when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      const loadFood = async () => {
-        setLoading(true);
-        const loadedFood = await getFoodById(foodId);
-        if (loadedFood) {
-          setFood(loadedFood);
-        }
-        setLoading(false);
-      };
-      loadFood();
-    }, [foodId])
-  );
 
   const handleSave = async (editedFood: FoodItem, quantity: number, newDate?: Date) => {
     if (isSaving) return; // Prevent multiple saves
@@ -98,16 +78,6 @@ export default function EditFoodScreen() {
     if (isSaving) return; // Prevent cancel during save
     safeGoBack(navigation);
   };
-
-  if (loading || !food) {
-    return (
-      <View style={styles.container}>
-        <View style={[styles.content, { paddingTop: insets.top + 20 }]}>
-          <Text style={styles.title}>Loading...</Text>
-        </View>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
