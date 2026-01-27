@@ -8,7 +8,7 @@
 // Utilities
 export { generateFoodId, getTodayDate } from './utils';
 
-// Food operations
+// Food operations (legacy - kept for backward compatibility)
 export {
   saveFood,
   getFoods,
@@ -16,7 +16,7 @@ export {
   deleteFood,
 } from './foods';
 
-// Daily log operations
+// Daily log operations (legacy - kept for backward compatibility)
 export {
   addFoodToDate,
   addFoodToToday,
@@ -45,3 +45,21 @@ export {
   saveLastDate,
   getLastDate,
 } from './macros';
+
+// New repository-based API (recommended for new code)
+export {
+  createFoodRepository,
+  createRecipeRepository,
+  createDailyLogRepository,
+  getFoodRepository,
+  getRecipeRepository,
+  getDailyLogRepository,
+  resetRepositories,
+} from './repositories';
+
+// Adapters for custom repository configurations
+export {
+  asyncStorageAdapter,
+  mobileFirestoreAdapter,
+  mobileRepositoryContext,
+} from './adapters';
