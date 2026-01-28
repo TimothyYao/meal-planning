@@ -30,6 +30,7 @@ export {
   updateFoodInLogEntry,
   getRecentFoods,
 } from './dailyLogs';
+export type { MoveFoodResult } from './dailyLogs';
 
 // Macro operations
 export {

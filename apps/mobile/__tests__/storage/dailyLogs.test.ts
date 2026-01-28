@@ -7,6 +7,8 @@ import {
   removeFoodFromDate,
   removeFoodFromToday,
   updateFoodQuantityInDate,
+  moveFoodToDate,
+  updateFoodInLogEntry,
   getRecentFoods,
   invalidateRecentFoodsCache,
 } from '../../storage/dailyLogs';
@@ -335,6 +337,95 @@ describe('Daily Logs Storage', () => {
       );
 
       await expect(invalidateRecentFoodsCache()).resolves.not.toThrow();
+    });
+  });
+
+  describe('moveFoodToDate', () => {
+    it('moves a food from one date to another and returns new location', async () => {
+      // Add food to the first date
+      await addFoodToDate(sampleFood, 1, '2024-06-15');
+
+      const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+      const logs = JSON.parse(logsJson!);
+      const mealId = logs['2024-06-15'].meals[0].id;
+
+      // Move to a new date
+      const result = await moveFoodToDate('2024-06-15', '2024-06-16', mealId, 0);
+
+      // Should return new location info
+      expect(result).not.toBeNull();
+      expect(result!.newMealId).toBeDefined();
+      expect(result!.newFoodIndex).toBe(0); // First food in the new meal
+
+      // Verify food is removed from old date
+      const updatedLogsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+      const updatedLogs = JSON.parse(updatedLogsJson!);
+      expect(updatedLogs['2024-06-15'].meals).toHaveLength(0);
+
+      // Verify food is added to new date
+      expect(updatedLogs['2024-06-16']).toBeDefined();
+      expect(updatedLogs['2024-06-16'].meals).toHaveLength(1);
+      expect(updatedLogs['2024-06-16'].meals[0].foods).toHaveLength(1);
+      expect(updatedLogs['2024-06-16'].meals[0].foods[0].food.name).toBe('Chicken Breast');
+    });
+
+    it('returns correct index when moving to a date with existing foods', async () => {
+      // Add food to first date
+      await addFoodToDate(sampleFood, 1, '2024-06-15');
+      // Add food to second date
+      await addFoodToDate(sampleFood2, 1, '2024-06-16');
+
+      const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+      const logs = JSON.parse(logsJson!);
+      const mealId = logs['2024-06-15'].meals[0].id;
+
+      // Move to the date that already has food
+      const result = await moveFoodToDate('2024-06-15', '2024-06-16', mealId, 0);
+
+      // Should return index 1 (added after existing food)
+      expect(result).not.toBeNull();
+      expect(result!.newFoodIndex).toBe(1);
+
+      // Verify both foods exist on the target date
+      const updatedLogsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+      const updatedLogs = JSON.parse(updatedLogsJson!);
+      expect(updatedLogs['2024-06-16'].meals[0].foods).toHaveLength(2);
+      expect(updatedLogs['2024-06-16'].meals[0].foods[0].food.name).toBe('Brown Rice');
+      expect(updatedLogs['2024-06-16'].meals[0].foods[1].food.name).toBe('Chicken Breast');
+    });
+
+    it('returns null when source date does not exist', async () => {
+      const result = await moveFoodToDate('2024-06-15', '2024-06-16', 'non-existent-meal', 0);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('moveFoodToDate + updateFoodInLogEntry', () => {
+    it('correctly updates food after moving to a new date', async () => {
+      // Add food to first date
+      await addFoodToDate(sampleFood, 1, '2024-06-15');
+
+      const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+      const logs = JSON.parse(logsJson!);
+      const originalMealId = logs['2024-06-15'].meals[0].id;
+
+      // Move to a new date
+      const moveResult = await moveFoodToDate('2024-06-15', '2024-06-16', originalMealId, 0);
+      expect(moveResult).not.toBeNull();
+
+      // Update the food in its new location with a new quantity
+      const updatedFood = { ...sampleFood, name: 'Updated Chicken Breast' };
+      await updateFoodInLogEntry('2024-06-16', moveResult!.newMealId, moveResult!.newFoodIndex, updatedFood, 2);
+
+      // Verify the food was updated correctly
+      const updatedLogsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
+      const updatedLogs = JSON.parse(updatedLogsJson!);
+      
+      expect(updatedLogs['2024-06-16'].meals[0].foods[0].food.name).toBe('Updated Chicken Breast');
+      expect(updatedLogs['2024-06-16'].meals[0].foods[0].quantity).toBe(2);
+      
+      // Verify macros are recalculated (2 servings)
+      expect(updatedLogs['2024-06-16'].totalMacros.protein).toBe(62); // 31 * 2
     });
   });
 });
