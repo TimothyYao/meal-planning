@@ -40,9 +40,11 @@ export default function EditFoodScreen() {
       
       // If date changed, move the food to the new date first
       if (newDateString !== oldDate) {
-        await moveFoodToDate(oldDate, newDateString, mealId, foodIndex);
-        // After moving, update the food in the new location
-        await updateFoodInLogEntry(newDateString, mealId, foodIndex, editedFood, quantity);
+        const moveResult = await moveFoodToDate(oldDate, newDateString, mealId, foodIndex);
+        if (moveResult) {
+          // After moving, update the food in the new location using the returned mealId and foodIndex
+          await updateFoodInLogEntry(newDateString, moveResult.newMealId, moveResult.newFoodIndex, editedFood, quantity);
+        }
       } else {
         // Update the food object and quantity in this log entry only
         await updateFoodInLogEntry(oldDate, mealId, foodIndex, editedFood, quantity);

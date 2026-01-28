@@ -526,15 +526,24 @@ export async function removeFoodFromToday(mealId: string, foodIndex: number): Pr
 }
 
 /**
- * Move a food item from one date to another
+ * Result of moving a food item to a new date
  */
-export async function moveFoodToDate(fromDate: string, toDate: string, mealId: string, foodIndex: number): Promise<void> {
+export interface MoveFoodResult {
+  newMealId: string;
+  newFoodIndex: number;
+}
+
+/**
+ * Move a food item from one date to another
+ * Returns the new location (mealId and foodIndex) of the moved food
+ */
+export async function moveFoodToDate(fromDate: string, toDate: string, mealId: string, foodIndex: number): Promise<MoveFoodResult | null> {
   try {
     const logsJson = await AsyncStorage.getItem(DAILY_LOGS_KEY);
     const logs: Record<string, any> = logsJson ? JSON.parse(logsJson) : {};
     
     const fromDateLog = logs[fromDate];
-    if (!fromDateLog) return;
+    if (!fromDateLog) return null;
     
     // Find the meal and get the food at the specified index
     const mealIndex = fromDateLog.meals.findIndex((m: any) => m.id === mealId);
@@ -572,10 +581,16 @@ export async function moveFoodToDate(fromDate: string, toDate: string, mealId: s
       // Update addedAt timestamp
       mealFood.addedAt = new Date();
       
+      // Track the new location
+      let newMealId: string;
+      let newFoodIndex: number;
+      
       // Add to a default "Meal" or create a new meal
       if (toDateLog.meals.length === 0) {
+        newMealId = await generateFoodId();
+        newFoodIndex = 0;
         toDateLog.meals.push({
-          id: await generateFoodId(),
+          id: newMealId,
           name: 'Meal',
           foods: [mealFood],
           timestamp: new Date(),
@@ -583,6 +598,8 @@ export async function moveFoodToDate(fromDate: string, toDate: string, mealId: s
         });
       } else {
         // Add to the first meal
+        newMealId = toDateLog.meals[0].id;
+        newFoodIndex = toDateLog.meals[0].foods.length; // Will be at the end after push
         toDateLog.meals[0].foods.push(mealFood);
         toDateLog.meals[0].macros = calculateMacros(toDateLog.meals[0].foods);
       }
@@ -609,7 +626,12 @@ export async function moveFoodToDate(fromDate: string, toDate: string, mealId: s
       invalidateRecentFoodsCache().catch((error) => {
         console.error('Error invalidating recent foods cache:', error);
       });
+      
+      // Return the new location
+      return { newMealId, newFoodIndex };
     }
+    
+    return null;
   } catch (error) {
     console.error('Error moving food to date:', error);
     throw error;
