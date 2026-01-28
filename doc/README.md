@@ -29,6 +29,7 @@ User stories are organized by feature category:
 - [Data Models](./data-models.md) - Core entities and data structures
 - [Design System](./design-system.md) - Style tokens and design guidelines
 - [Recipes Design](./recipes-design.md) - Food creation, recipe building, and tracking workflows
+- [Nutrition Scanner Design](./nutrition-scanner-design.md) - Specification for OCR and API-based nutrition scanning
 - [Success Metrics](./success-metrics.md) - KPIs and measurement criteria
 - [Future Considerations](./future-considerations.md) - Additional ideas and opportunities
 
