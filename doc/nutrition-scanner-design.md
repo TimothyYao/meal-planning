@@ -110,7 +110,50 @@ Protein 3g
 4.  **Integration**:
     -   Connect Camera -> OCR -> Parser -> `EditFoodScreen`.
 
-## 6. Risks & Mitigations
+## 6. Testing Strategy
+
+To ensure robust OCR parsing across different label formats (US, EU, various fonts/sizes), a dedicated testing repository/harness is required.
+
+### 6.1. Test Repository Structure
+Create a dedicated folder (e.g., `apps/mobile/__tests__/fixtures/ocr`) containing:
+1.  **Sample Images**: A diverse collection of nutrition label photos (high/low quality, different angles).
+2.  **Expected Outputs**: JSON files matching the image filenames, containing the ground-truth data.
+
+**Structure Example:**
+```
+/apps/mobile/__tests__/fixtures/ocr/
+  ├── label_001.jpg          # Raw image
+  ├── label_001.json         # Expected parsed data
+  ├── label_002_tilted.jpg
+  ├── label_002_tilted.json
+  └── ...
+```
+
+### 6.2. Expected Output Format (JSON)
+Each test case should define the expected extracted values:
+```json
+{
+  "calories": 230,
+  "protein": 3,
+  "totalFat": 8,
+  "totalCarbohydrate": 37,
+  "servingSize": "1 cup",
+  "meta": {
+      "confidence": "high",
+      "region": "US"
+  }
+}
+```
+
+### 6.3. Automated Testing Workflow
+1.  **Mocking OCR**: Since ML Kit runs on-device, unit tests should mock the OCR output string.
+2.  **Integration Tests**:
+    -   Load the sample image (or its mock text representation).
+    -   Run `parseNutritionLabel()`.
+    -   Compare result against the corresponding JSON file.
+    -   Fail if accuracy is below a certain threshold (e.g., critical fields like Calories must match exactly).
+
+## 7. Risks & Mitigations
 
 | Risk | Mitigation |
 | :--- | :--- |
@@ -119,6 +162,6 @@ Protein 3g
 | **Lighting/Blur** | Check image sharpness before processing (if possible) or guide user to hold phone steady. |
 | **App Size** | ML Kit is bundled with the OS (Android) or relatively small static lib (iOS), keeping app size manageable. |
 
-## 7. Future Enhancements
+## 8. Future Enhancements
 -   **Real-time AR**: Overlay recognized numbers directly on the camera feed (using VisionCamera).
 -   **Barcode Integration**: Detect barcodes in the same view and auto-query OpenFoodFacts.
