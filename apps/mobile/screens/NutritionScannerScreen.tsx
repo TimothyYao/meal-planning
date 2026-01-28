@@ -2,15 +2,16 @@ import { useState, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize } from '@meal-planning/shared';
+import { colors, spacing, fontSize, fontColor } from '@meal-planning/shared';
 import { parseNutritionLabel } from '../utils/nutritionParser';
 import { safeGoBack } from '../utils/navigation';
 
 export default function NutritionScannerScreen() {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [isProcessing, setIsProcessing] = useState(false);
   const cameraRef = useRef<CameraView>(null);
@@ -22,11 +23,13 @@ export default function NutritionScannerScreen() {
 
   if (!permission.granted) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.message}>We need your permission to show the camera</Text>
-        <TouchableOpacity onPress={requestPermission} style={styles.permissionButton}>
-          <Text style={styles.permissionButtonText}>Grant Permission</Text>
-        </TouchableOpacity>
+      <View style={[styles.permissionContainer, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.permissionContent}>
+            <Text style={styles.message}>We need your permission to show the camera</Text>
+            <TouchableOpacity onPress={requestPermission} style={styles.permissionButton}>
+              <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            </TouchableOpacity>
+        </View>
         <TouchableOpacity onPress={() => safeGoBack(navigation)} style={styles.cancelButton}>
             <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
@@ -46,9 +49,9 @@ export default function NutritionScannerScreen() {
         if (photo) {
           await processImage(photo.uri);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error taking picture:', error);
-        Alert.alert('Error', 'Failed to capture image');
+        Alert.alert('Error', `Failed to capture image: ${error?.message || 'Unknown error'}`);
         setIsProcessing(false);
       }
     }
@@ -100,17 +103,17 @@ export default function NutritionScannerScreen() {
       // @ts-ignore - navigation types need update
       navigation.navigate('AddFood', { duplicateFood: dummyFood });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing image:', error);
-      Alert.alert('Error', 'Failed to extract nutrition data');
+      Alert.alert('Error', `Failed to extract nutrition data: ${error?.message || 'Unknown error'}`);
       setIsProcessing(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <CameraView style={styles.camera} ref={cameraRef} facing="back">
-        <View style={styles.overlay}>
+        <View style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => safeGoBack(navigation)} style={styles.closeButton}>
               <Ionicons name="close" size={28} color="white" />
@@ -143,7 +146,7 @@ export default function NutritionScannerScreen() {
           </View>
         </View>
       </CameraView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -151,6 +154,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'black',
+  },
+  permissionContainer: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  permissionContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   camera: {
     flex: 1,
@@ -165,13 +179,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: spacing.xl,
+    minHeight: 50,
   },
   closeButton: {
     position: 'absolute',
     left: spacing.md,
-    top: spacing.xl,
+    top: spacing.md,
     padding: spacing.xs,
+    zIndex: 10,
   },
   title: {
     color: 'white',
@@ -181,7 +196,7 @@ const styles = StyleSheet.create({
   message: {
     textAlign: 'center',
     paddingBottom: 10,
-    color: 'white',
+    color: fontColor.primary,
     fontSize: fontSize.md,
   },
   permissionButton: {
@@ -196,8 +211,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cancelButton: {
-      marginTop: 20,
-      padding: 10,
+      padding: 15,
+      width: '100%',
+      alignItems: 'center',
   },
   cancelButtonText: {
       color: colors.primary,
@@ -258,7 +274,7 @@ const styles = StyleSheet.create({
       borderTopWidth: 0,
   },
   controls: {
-      paddingBottom: 50,
+      paddingBottom: 30,
       alignItems: 'center',
   },
   captureButton: {
