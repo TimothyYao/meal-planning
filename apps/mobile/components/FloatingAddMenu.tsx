@@ -13,9 +13,10 @@ interface FloatingAddMenuProps {
   onClose: () => void;
   onCustomFood: () => void;
   onSearch: () => void;
+  onScan: () => void;
 }
 
-export default function FloatingAddMenu({ visible, onClose, onCustomFood, onSearch }: FloatingAddMenuProps) {
+export default function FloatingAddMenu({ visible, onClose, onCustomFood, onSearch, onScan }: FloatingAddMenuProps) {
   const insets = useSafeAreaInsets();
   const [recentFoods, setRecentFoods] = useState<Array<{ food: FoodItem; lastAdded: Date }>>([]);
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -90,7 +91,7 @@ export default function FloatingAddMenu({ visible, onClose, onCustomFood, onSear
 
   const handleNutritionLabelScan = () => {
     onClose();
-    Alert.alert('Coming Soon', 'Nutrition label scan feature will be available soon.');
+    onScan();
   };
 
   const handleCreateRecipe = () => {

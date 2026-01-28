@@ -25,6 +25,7 @@ import FoodDetailScreen from './screens/FoodDetailScreen';
 import EditFoodScreen from './screens/EditFoodScreen';
 import SearchFoodScreen from './screens/SearchFoodScreen';
 import FloatingAddMenu from './components/FloatingAddMenu';
+import NutritionScannerScreen from './screens/NutritionScannerScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -163,6 +164,7 @@ const linking = {
       AddFood: 'add-food/custom',
       SearchFood: 'add-food/search',
       PhoneAuth: 'phone-auth',
+      NutritionScanner: 'scanner',
     },
   },
 };
@@ -184,6 +186,13 @@ export default function App() {
     hideFloatingAddMenu();
     if (navigationRef.current) {
       navigationRef.current.navigate('SearchFood' as never);
+    }
+  };
+
+  const handleScan = () => {
+    hideFloatingAddMenu();
+    if (navigationRef.current) {
+      navigationRef.current.navigate('NutritionScanner' as never);
     }
   };
 
@@ -227,6 +236,14 @@ export default function App() {
                   presentation: 'modal',
                 }}
               />
+              <Stack.Screen
+                name="NutritionScanner"
+                component={NutritionScannerScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'fullScreenModal',
+                }}
+              />
             </Stack.Navigator>
           </NavigationContainer>
           <FloatingAddMenu
@@ -234,6 +251,7 @@ export default function App() {
             onClose={() => setFloatingMenuVisibleState(false)}
             onCustomFood={handleCustomFood}
             onSearch={handleSearch}
+            onScan={handleScan}
           />
         </SafeAreaProvider>
       </GestureHandlerRootView>
