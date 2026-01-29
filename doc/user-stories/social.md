@@ -1,17 +1,16 @@
 # User Stories: Social & Sharing
 
-## US-017: Share My Foods Library
+## US-017: Share My Foods
 
 **As a** user  
-**I want to** share all my custom foods with family members or friends  
+**I want to** share all my custom foods with another user  
 **So that** they can use the same food items for their tracking
 
 **Acceptance Criteria:**
-- Share my foods via email address (creates direct connection)
-- Share my foods via shareable code (for messaging, etc.)
-- Set permission level (view only or view & copy)
-- View list of people I'm sharing with
-- Stop sharing with someone at any time
+- Add a user by their user ID to share my foods with them
+- View list of users I'm sharing with
+- Remove a user to stop sharing with them
+- Copy my user ID to share with others
 
 **See also:** [Food Sharing Design](../food-sharing-design.md)
 
@@ -27,36 +26,21 @@
 - View "Shared with Me" tab in foods list
 - See foods grouped by who shared them
 - View nutrition details of shared foods
-- Copy shared foods to my collection (if permitted)
+- Copy shared foods to my own collection
 - Use shared foods when logging meals
 
 ---
 
-## US-017b: Accept Share Code
-
-**As a** user  
-**I want to** accept a share code from another user  
-**So that** I can access their food library
-
-**Acceptance Criteria:**
-- Enter a share code manually
-- Preview who is sharing and permission level
-- One-tap to accept and establish connection
-- Handle expired or invalid codes gracefully
-
----
-
-## US-017c: Leave Sharing Connection
+## US-017b: Leave Sharing
 
 **As a** user  
 **I want to** stop seeing foods from someone sharing with me  
 **So that** I can manage my shared foods list
 
 **Acceptance Criteria:**
-- View list of people sharing with me
-- Leave a connection with one tap
+- View list of users sharing with me
+- Leave with one tap
 - Confirmation before leaving
-- Can re-connect later with a new share code
 
 ---
 

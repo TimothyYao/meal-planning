@@ -102,84 +102,13 @@ export interface AuthUser {
 // ============================================
 
 /**
- * Permission levels for shared foods
- */
-export type SharePermission = 'view' | 'copy';
-
-/**
- * Status of a sharing connection
- */
-export type ConnectionStatus = 'active' | 'revoked';
-
-/**
- * Status of a share invite
- */
-export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
-
-/**
  * Represents a one-way sharing relationship between two users.
  * The owner shares ALL their foods with the recipient.
  */
 export interface FoodSharingConnection {
-  id: string;
   ownerId: string;
-  ownerEmail: string;
-  ownerDisplayName?: string;
-  sharedWithUserId: string;
-  sharedWithEmail: string;
-  sharedWithDisplayName?: string;
-  permission: SharePermission;
-  status: ConnectionStatus;
+  recipientId: string;
   createdAt: Date;
-  updatedAt: Date;
-}
-
-/**
- * A shareable invite code that establishes a sharing connection.
- */
-export interface ShareInvite {
-  id: string;
-  code: string;
-  ownerId: string;
-  ownerEmail: string;
-  ownerDisplayName?: string;
-  permission: SharePermission;
-  status: InviteStatus;
-  acceptedByUserId?: string;
-  createdAt: Date;
-  expiresAt: Date;
-}
-
-/**
- * Result of a share operation
- */
-export interface ShareResult {
-  success: boolean;
-  connectionId?: string;
-  inviteId?: string;
-  error?: string;
-}
-
-/**
- * Result of accepting a share invite
- */
-export interface AcceptResult {
-  success: boolean;
-  connectionId?: string;
-  ownerName?: string;
-  foodCount?: number;
-  error?: string;
-}
-
-/**
- * Preview information for a share code
- */
-export interface ShareCodePreview {
-  ownerDisplayName: string;
-  ownerEmail: string;
-  permission: SharePermission;
-  foodCount: number;
-  expiresAt: Date;
 }
 
 /**
@@ -187,9 +116,6 @@ export interface ShareCodePreview {
  */
 export interface SharedFood extends FoodItem {
   ownerId: string;
-  ownerDisplayName?: string;
-  ownerEmail?: string;
-  canCopy: boolean;
 }
 
 // Utility functions

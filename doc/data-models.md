@@ -240,17 +240,9 @@ An item on a shopping list.
 Represents a one-way sharing relationship between two users. The owner shares ALL their foods with the recipient.
 
 **Fields:**
-- `id`: string (unique identifier)
 - `ownerId`: string (user ID of the person sharing)
-- `ownerEmail`: string (owner's email)
-- `ownerDisplayName`: string (optional, owner's display name)
-- `sharedWithUserId`: string (user ID of the recipient)
-- `sharedWithEmail`: string (recipient's email)
-- `sharedWithDisplayName`: string (optional, recipient's display name)
-- `permission`: 'view' | 'copy' (can recipient copy foods?)
-- `status`: 'active' | 'revoked'
+- `recipientId`: string (user ID of the recipient)
 - `createdAt`: Date
-- `updatedAt`: Date
 
 **Relationships:**
 - Belongs to UserProfile (owner)
@@ -258,32 +250,10 @@ Represents a one-way sharing relationship between two users. The owner shares AL
 - Grants access to all owner's FoodItems
 
 **Storage:**
-- Stored in `users/{ownerId}/sharingWith/{connectionId}` (owner's view)
-- Stored in `users/{recipientId}/sharedWithMe/{connectionId}` (recipient's view)
+- Stored in `users/{ownerId}/sharingWith/{recipientId}` (owner's outgoing list)
+- Stored in `users/{recipientId}/sharedWithMe/{ownerId}` (recipient's incoming list)
 
----
-
-### ShareInvite
-A shareable code that establishes a sharing connection when accepted.
-
-**Fields:**
-- `id`: string (unique identifier)
-- `code`: string (8-character invite code, e.g., "ABCD-1234")
-- `ownerId`: string (user ID of the inviter)
-- `ownerEmail`: string (inviter's email)
-- `ownerDisplayName`: string (optional, inviter's display name)
-- `permission`: 'view' | 'copy' (permission to grant)
-- `status`: 'pending' | 'accepted' | 'expired' | 'revoked'
-- `acceptedByUserId`: string (optional, who accepted the invite)
-- `createdAt`: Date
-- `expiresAt`: Date (default: 7 days)
-
-**Relationships:**
-- Belongs to UserProfile (owner)
-- Creates FoodSharingConnection when accepted
-
-**Storage:**
-- Stored in `shareInvites/{code}` (global collection for lookup)
+**Note:** Using the target user ID as the document ID prevents duplicates and enables direct lookups.
 
 ---
 
@@ -387,8 +357,4 @@ FoodSharingConnection
   ├── belongs to UserProfile (owner)
   ├── belongs to UserProfile (recipient)
   └── grants access to all owner's FoodItems
-
-ShareInvite
-  ├── belongs to UserProfile (owner)
-  └── creates FoodSharingConnection when accepted
 ```
