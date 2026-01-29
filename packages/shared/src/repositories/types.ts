@@ -3,7 +3,21 @@
  * These provide a clean abstraction over Firestore operations with local caching support.
  */
 
-import type { FoodItem, Recipe, DailyLog, Meal, MacroTargets } from '../index';
+import type { 
+  FoodItem, 
+  Recipe, 
+  DailyLog, 
+  Meal, 
+  MacroTargets,
+  FoodShare,
+  ShareInvite,
+  SharedFoodAccess,
+  ShareOptions,
+  InviteOptions,
+  ShareResult,
+  InvitePreview,
+  AcceptInviteResult,
+} from '../index';
 
 /**
  * Firestore-like document reference for type compatibility
@@ -177,4 +191,104 @@ export interface RepositoryContext {
    * Get current date in YYYY-MM-DD format
    */
   getCurrentDate(): string;
+}
+
+/**
+ * Shared food repository interface for managing food sharing operations.
+ * Handles both outgoing shares (sharing your foods) and incoming shares
+ * (foods shared with you).
+ */
+export interface ISharedFoodRepository {
+  // === Sharing Operations (Owner/Outgoing) ===
+
+  /**
+   * Share a food with another user by email.
+   * If the user exists, creates a direct share.
+   * If the user doesn't exist, creates an invite that will be linked when they sign up.
+   */
+  shareFood(
+    foodId: string,
+    recipientEmail: string,
+    options: ShareOptions
+  ): Promise<ShareResult>;
+
+  /**
+   * Create a shareable invite code for one or more foods.
+   * The code can be shared via text, email, or other means.
+   */
+  createInvite(
+    foodIds: string[],
+    options: InviteOptions
+  ): Promise<ShareInvite>;
+
+  /**
+   * Get all shares created by the current user (outgoing).
+   */
+  getOutgoingShares(): Promise<FoodShare[]>;
+
+  /**
+   * Get all shares for a specific food owned by the current user.
+   */
+  getSharesForFood(foodId: string): Promise<FoodShare[]>;
+
+  /**
+   * Get all active invite codes created by the current user.
+   */
+  getActiveInvites(): Promise<ShareInvite[]>;
+
+  /**
+   * Revoke a direct share, removing the recipient's access.
+   */
+  revokeShare(shareId: string): Promise<void>;
+
+  /**
+   * Revoke/deactivate a share invite code.
+   */
+  revokeInvite(inviteId: string): Promise<void>;
+
+  // === Receiving Operations (Recipient/Incoming) ===
+
+  /**
+   * Get all foods shared with the current user (incoming).
+   * Filters out expired shares automatically.
+   */
+  getSharedFoods(): Promise<SharedFoodAccess[]>;
+
+  /**
+   * Get foods shared with the current user, grouped by owner.
+   */
+  getSharedFoodsGroupedByOwner(): Promise<Map<string, SharedFoodAccess[]>>;
+
+  /**
+   * Get a specific shared food by ID.
+   */
+  getSharedFoodById(foodId: string): Promise<SharedFoodAccess | null>;
+
+  /**
+   * Preview an invite before accepting it.
+   * Returns null if the invite is invalid, expired, or fully used.
+   */
+  previewInvite(code: string): Promise<InvitePreview | null>;
+
+  /**
+   * Accept a share invite, adding the foods to the user's shared foods.
+   */
+  acceptInvite(code: string): Promise<AcceptInviteResult>;
+
+  /**
+   * Copy a shared food to the user's own collection.
+   * Only works if the share permission allows copying.
+   */
+  copySharedFood(foodId: string, newName?: string): Promise<FoodItem>;
+
+  /**
+   * Hide a shared food from view (doesn't affect the owner's share).
+   * The user can still access the food again via the share code if available.
+   */
+  hideSharedFood(foodId: string): Promise<void>;
+
+  /**
+   * Search shared foods by name.
+   */
+  searchSharedFoods(query: string): Promise<SharedFoodAccess[]>;
 }

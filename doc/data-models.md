@@ -234,6 +234,78 @@ An item on a shopping list.
 
 ---
 
+## Food Sharing Models
+
+### FoodShare
+Represents a sharing permission granted to another user for a food item.
+
+**Fields:**
+- `id`: string (unique identifier)
+- `foodId`: string (reference to the shared food)
+- `ownerId`: string (user ID of the food owner)
+- `sharedWithUserId`: string (user ID of the recipient)
+- `sharedWithEmail`: string (optional, email used for sharing)
+- `permission`: 'view' | 'copy' (permission level)
+- `status`: 'pending' | 'active' | 'revoked'
+- `createdAt`: Date
+- `updatedAt`: Date
+- `expiresAt`: Date (optional, expiration date)
+- `note`: string (optional, message from the sharer)
+
+**Relationships:**
+- Belongs to UserProfile (owner)
+- References FoodItem
+- References UserProfile (recipient)
+
+---
+
+### ShareInvite
+A shareable invite code for foods that can be used by multiple users.
+
+**Fields:**
+- `id`: string (unique identifier)
+- `code`: string (unique 8-character invite code)
+- `ownerId`: string (user ID of the inviter)
+- `ownerEmail`: string (optional, email of the inviter)
+- `ownerDisplayName`: string (optional, display name of the inviter)
+- `foodIds`: string[] (foods included in the invite)
+- `permission`: 'view' | 'copy' (permission level)
+- `status`: 'pending' | 'accepted' | 'expired' | 'revoked'
+- `maxUses`: number (maximum uses allowed)
+- `useCount`: number (current use count)
+- `usedBy`: string[] (user IDs who have used this invite)
+- `createdAt`: Date
+- `expiresAt`: Date
+
+**Relationships:**
+- Belongs to UserProfile (owner)
+- References multiple FoodItems
+
+---
+
+### SharedFoodAccess
+Denormalized view of a shared food stored in the recipient's subcollection.
+
+**Fields:**
+- `id`: string (same as foodId)
+- `foodId`: string (reference to the original food)
+- `ownerId`: string (user ID of the food owner)
+- `ownerEmail`: string (optional, owner's email)
+- `ownerDisplayName`: string (optional, owner's display name)
+- `food`: FoodItem (embedded snapshot)
+- `permission`: 'view' | 'copy'
+- `sharedAt`: Date
+- `expiresAt`: Date (optional)
+
+**Relationships:**
+- Belongs to UserProfile (recipient)
+- References FoodItem (embedded)
+- References UserProfile (owner)
+
+**Note:** This denormalized structure allows efficient querying of shared foods without requiring joins or multiple document reads.
+
+---
+
 ## Additional Models (Future)
 
 ### ProgressEntry
@@ -290,7 +362,10 @@ UserProfile
   ├── has many DailyLogs
   ├── has many Recipes
   ├── has many MealPlans
-  └── has many ShoppingLists
+  ├── has many ShoppingLists
+  ├── has many FoodShares (outgoing)
+  ├── has many SharedFoodAccess (incoming)
+  └── has many ShareInvites
 
 DailyLog
   ├── belongs to UserProfile
@@ -326,4 +401,18 @@ ShoppingList
 
 ShoppingListItem
   └── references FoodItem
+
+FoodShare
+  ├── belongs to UserProfile (owner)
+  ├── references UserProfile (recipient)
+  └── references FoodItem
+
+ShareInvite
+  ├── belongs to UserProfile (owner)
+  └── references many FoodItems
+
+SharedFoodAccess
+  ├── belongs to UserProfile (recipient)
+  ├── references UserProfile (owner)
+  └── embeds FoodItem (snapshot)
 ```

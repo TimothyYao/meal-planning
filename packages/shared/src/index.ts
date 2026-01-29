@@ -97,6 +97,154 @@ export interface AuthUser {
   photoURL: string | null;
 }
 
+// ============================================
+// Food Sharing Types
+// ============================================
+
+/**
+ * Permission levels for shared foods
+ */
+export type SharePermission = 'view' | 'copy';
+
+/**
+ * Status of a food share
+ */
+export type ShareStatus = 'pending' | 'active' | 'revoked';
+
+/**
+ * Status of a share invite
+ */
+export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
+
+/**
+ * Represents a sharing permission granted to another user for a food item.
+ */
+export interface FoodShare {
+  id: string;
+  foodId: string;
+  ownerId: string;
+  sharedWithUserId: string;
+  sharedWithEmail?: string;
+  permission: SharePermission;
+  status: ShareStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  expiresAt?: Date;
+  note?: string;
+}
+
+/**
+ * A shareable invite code for foods that can be used by multiple users.
+ */
+export interface ShareInvite {
+  id: string;
+  code: string;
+  ownerId: string;
+  ownerEmail?: string;
+  ownerDisplayName?: string;
+  foodIds: string[];
+  permission: SharePermission;
+  status: InviteStatus;
+  maxUses: number;
+  useCount: number;
+  usedBy: string[];
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+/**
+ * Denormalized view of a shared food stored in the recipient's subcollection.
+ */
+export interface SharedFoodAccess {
+  id: string;
+  foodId: string;
+  ownerId: string;
+  ownerEmail?: string;
+  ownerDisplayName?: string;
+  food: FoodItem;
+  permission: SharePermission;
+  sharedAt: Date;
+  expiresAt?: Date;
+}
+
+/**
+ * Options for sharing a food with another user
+ */
+export interface ShareOptions {
+  permission: SharePermission;
+  expiresAt?: Date;
+  note?: string;
+}
+
+/**
+ * Options for creating a share invite
+ */
+export interface InviteOptions {
+  permission: SharePermission;
+  expiresAt?: Date;
+  maxUses?: number;
+}
+
+/**
+ * Result of a share operation
+ */
+export interface ShareResult {
+  success: boolean;
+  shareId?: string;
+  inviteId?: string;
+  error?: string;
+}
+
+/**
+ * Preview information for a share invite
+ */
+export interface InvitePreview {
+  ownerDisplayName: string;
+  ownerEmail?: string;
+  foods: Array<{ name: string; macros: MacroTargets }>;
+  permission: SharePermission;
+  expiresAt: Date;
+  remainingUses: number;
+}
+
+/**
+ * Result of accepting a share invite
+ */
+export interface AcceptInviteResult {
+  success: boolean;
+  foodsAdded: number;
+  error?: string;
+}
+
+/**
+ * Notification types for sharing events
+ */
+export type ShareNotificationType = 
+  | 'food_shared'
+  | 'invite_accepted'
+  | 'share_revoked'
+  | 'invite_expiring';
+
+/**
+ * Notification data for sharing events
+ */
+export interface ShareNotification {
+  id: string;
+  userId: string;
+  type: ShareNotificationType;
+  title: string;
+  message: string;
+  data: {
+    foodId?: string;
+    shareId?: string;
+    inviteCode?: string;
+    ownerId?: string;
+    ownerName?: string;
+  };
+  read: boolean;
+  createdAt: Date;
+}
+
 // Utility functions
 export function calculateMacros(foods: MealFood[]): MacroTargets {
   return foods.reduce(
