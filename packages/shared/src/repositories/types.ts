@@ -188,11 +188,13 @@ export interface RepositoryContext {
 
 /**
  * Food sharing repository interface.
- * Users share their ENTIRE food library with other users by user ID.
+ * Owner controls who can view their foods via sharingWith list.
+ * Recipients view foods by knowing the owner's user ID.
  */
 export interface IFoodSharingRepository {
   /**
    * Share my foods with a user by their user ID.
+   * Only writes to my own sharingWith collection.
    */
   shareWith(recipientId: string): Promise<void>;
 
@@ -207,37 +209,17 @@ export interface IFoodSharingRepository {
   getSharingWith(): Promise<string[]>;
 
   /**
-   * Get list of user IDs sharing their foods with me.
-   */
-  getSharedWithMe(): Promise<string[]>;
-
-  /**
-   * Leave a sharing connection (stop seeing their foods).
-   */
-  leaveSharing(ownerId: string): Promise<void>;
-
-  /**
-   * Get all foods from users sharing with me.
-   */
-  getSharedFoods(): Promise<SharedFood[]>;
-
-  /**
-   * Get foods from a specific user sharing with me.
-   */
-  getFoodsFrom(ownerId: string): Promise<SharedFood[]>;
-
-  /**
-   * Copy a shared food to my collection.
-   */
-  copyFood(ownerId: string, foodId: string): Promise<FoodItem>;
-
-  /**
    * Check if I'm currently sharing with a specific user.
    */
   isSharingWith(recipientId: string): Promise<boolean>;
 
   /**
-   * Check if a specific user is sharing with me.
+   * Get foods from a specific user by their user ID.
    */
-  isSharedWithMe(ownerId: string): Promise<boolean>;
+  getFoodsFrom(ownerId: string): Promise<SharedFood[]>;
+
+  /**
+   * Copy a food to my collection.
+   */
+  copyFood(ownerId: string, foodId: string): Promise<FoodItem>;
 }

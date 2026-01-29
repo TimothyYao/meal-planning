@@ -1,9 +1,9 @@
 /**
  * Food Sharing Repository Implementation
- * Manages sharing connections between users for food libraries
+ * Manages sharing connections - owner controls who can view their foods
  */
 
-import type { FoodItem, FoodSharingConnection, SharedFood } from '../index';
+import type { FoodItem, SharedFood } from '../index';
 import type { IFoodSharingRepository, RepositoryContext, FirestoreAdapter } from './types';
 
 export class FoodSharingRepository implements IFoodSharingRepository {
@@ -27,19 +27,10 @@ export class FoodSharingRepository implements IFoodSharingRepository {
   }
 
   /**
-   * Get the path to the user's sharingWith collection
+   * Get the path to a user's sharingWith collection
    */
-  private getSharingWithPath(userId?: string): string {
-    const id = userId || this.requireUserId();
-    return `users/${id}/sharingWith`;
-  }
-
-  /**
-   * Get the path to the user's sharedWithMe collection
-   */
-  private getSharedWithMePath(userId?: string): string {
-    const id = userId || this.requireUserId();
-    return `users/${id}/sharedWithMe`;
+  private getSharingWithPath(userId: string): string {
+    return `users/${userId}/sharingWith`;
   }
 
   /**
@@ -50,7 +41,8 @@ export class FoodSharingRepository implements IFoodSharingRepository {
   }
 
   /**
-   * Share my foods with a user by their user ID
+   * Share my foods with a user by their user ID.
+   * Only writes to my own collection.
    */
   async shareWith(recipientId: string): Promise<void> {
     const myId = this.requireUserId();
@@ -59,89 +51,47 @@ export class FoodSharingRepository implements IFoodSharingRepository {
       throw new Error('Cannot share with yourself');
     }
 
-    const connection: FoodSharingConnection = {
-      ownerId: myId,
-      recipientId: recipientId,
-      createdAt: new Date(),
-    };
-
-    // Write to both collections in parallel
-    await Promise.all([
-      // My outgoing shares
-      this.firestore.setDoc(this.getSharingWithPath(myId), recipientId, connection),
-      // Their incoming shares
-      this.firestore.setDoc(this.getSharedWithMePath(recipientId), myId, connection),
-    ]);
+    // Only write to my own sharingWith collection
+    await this.firestore.setDoc(
+      this.getSharingWithPath(myId),
+      recipientId,
+      { added: new Date() }
+    );
   }
 
   /**
-   * Stop sharing my foods with a user
+   * Stop sharing my foods with a user.
+   * Only deletes from my own collection.
    */
   async stopSharingWith(recipientId: string): Promise<void> {
     const myId = this.requireUserId();
-
-    // Delete from both collections in parallel
-    await Promise.all([
-      this.firestore.deleteDoc(this.getSharingWithPath(myId), recipientId),
-      this.firestore.deleteDoc(this.getSharedWithMePath(recipientId), myId),
-    ]);
+    await this.firestore.deleteDoc(this.getSharingWithPath(myId), recipientId);
   }
 
   /**
-   * Get list of user IDs I'm sharing my foods with
+   * Get list of user IDs I'm sharing my foods with.
    */
   async getSharingWith(): Promise<string[]> {
     const myId = this.requireUserId();
-    const docs = await this.firestore.getDocs<FoodSharingConnection>(
-      this.getSharingWithPath(myId)
-    );
+    const docs = await this.firestore.getDocs(this.getSharingWithPath(myId));
     return docs.map((doc) => doc.id);
   }
 
   /**
-   * Get list of user IDs sharing their foods with me
+   * Check if I'm currently sharing with a specific user.
    */
-  async getSharedWithMe(): Promise<string[]> {
+  async isSharingWith(recipientId: string): Promise<boolean> {
     const myId = this.requireUserId();
-    const docs = await this.firestore.getDocs<FoodSharingConnection>(
-      this.getSharedWithMePath(myId)
+    const doc = await this.firestore.getDoc(
+      this.getSharingWithPath(myId),
+      recipientId
     );
-    return docs.map((doc) => doc.id);
+    return doc !== null && doc.exists();
   }
 
   /**
-   * Leave a sharing connection (stop seeing their foods)
-   */
-  async leaveSharing(ownerId: string): Promise<void> {
-    const myId = this.requireUserId();
-
-    // Delete from both collections in parallel
-    await Promise.all([
-      // Remove from my incoming shares
-      this.firestore.deleteDoc(this.getSharedWithMePath(myId), ownerId),
-      // Remove from their outgoing shares
-      this.firestore.deleteDoc(this.getSharingWithPath(ownerId), myId),
-    ]);
-  }
-
-  /**
-   * Get all foods from users sharing with me
-   */
-  async getSharedFoods(): Promise<SharedFood[]> {
-    const ownerIds = await this.getSharedWithMe();
-    const allFoods: SharedFood[] = [];
-
-    // Fetch foods from each owner
-    for (const ownerId of ownerIds) {
-      const foods = await this.getFoodsFrom(ownerId);
-      allFoods.push(...foods);
-    }
-
-    return allFoods;
-  }
-
-  /**
-   * Get foods from a specific user sharing with me
+   * Get foods from a specific user.
+   * Caller should know the owner's user ID.
    */
   async getFoodsFrom(ownerId: string): Promise<SharedFood[]> {
     const docs = await this.firestore.getDocs<FoodItem>(this.getFoodsPath(ownerId));
@@ -153,16 +103,11 @@ export class FoodSharingRepository implements IFoodSharingRepository {
   }
 
   /**
-   * Copy a shared food to my collection
+   * Copy a food to my collection.
+   * Simple convenience function - just duplicates the food data.
    */
   async copyFood(ownerId: string, foodId: string): Promise<FoodItem> {
     const myId = this.requireUserId();
-
-    // Verify we have access to this owner's foods
-    const sharedWithMe = await this.getSharedWithMe();
-    if (!sharedWithMe.includes(ownerId)) {
-      throw new Error('You do not have access to this user\'s foods');
-    }
 
     // Get the original food
     const foodDoc = await this.firestore.getDoc<FoodItem>(
@@ -176,11 +121,10 @@ export class FoodSharingRepository implements IFoodSharingRepository {
 
     const originalFood = foodDoc.data()!;
 
-    // Create a copy with new ID and metadata
+    // Create a copy with new ID
     const newFood: FoodItem = {
       ...originalFood,
       id: this.context.generateId(),
-      source: `shared:${ownerId}`,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -189,29 +133,5 @@ export class FoodSharingRepository implements IFoodSharingRepository {
     await this.firestore.setDoc(this.getFoodsPath(myId), newFood.id, newFood);
 
     return newFood;
-  }
-
-  /**
-   * Check if I'm sharing with a specific user
-   */
-  async isSharingWith(recipientId: string): Promise<boolean> {
-    const myId = this.requireUserId();
-    const doc = await this.firestore.getDoc<FoodSharingConnection>(
-      this.getSharingWithPath(myId),
-      recipientId
-    );
-    return doc !== null && doc.exists();
-  }
-
-  /**
-   * Check if a user is sharing with me
-   */
-  async isSharedWithMe(ownerId: string): Promise<boolean> {
-    const myId = this.requireUserId();
-    const doc = await this.firestore.getDoc<FoodSharingConnection>(
-      this.getSharedWithMePath(myId),
-      ownerId
-    );
-    return doc !== null && doc.exists();
   }
 }

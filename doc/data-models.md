@@ -234,26 +234,16 @@ An item on a shopping list.
 
 ---
 
-## Food Sharing Models
+## Food Sharing
 
-### FoodSharingConnection
-Represents a one-way sharing relationship between two users. The owner shares ALL their foods with the recipient.
-
-**Fields:**
-- `ownerId`: string (user ID of the person sharing)
-- `recipientId`: string (user ID of the recipient)
-- `createdAt`: Date
-
-**Relationships:**
-- Belongs to UserProfile (owner)
-- Belongs to UserProfile (recipient)
-- Grants access to all owner's FoodItems
+Food sharing is managed through a simple `sharingWith` subcollection. Owner adds recipient user IDs to grant access. Security rules enforce that only listed users can read the owner's foods.
 
 **Storage:**
-- Stored in `users/{ownerId}/sharingWith/{recipientId}` (owner's outgoing list)
-- Stored in `users/{recipientId}/sharedWithMe/{ownerId}` (recipient's incoming list)
+- `users/{ownerId}/sharingWith/{recipientId}` - document with `{ added: Date }`
 
-**Note:** Using the target user ID as the document ID prevents duplicates and enables direct lookups.
+**Access Control:**
+- Firestore security rules check if reader's ID exists in owner's `sharingWith` collection
+- No separate "sharedWithMe" collection needed
 
 ---
 
@@ -353,8 +343,6 @@ ShoppingList
 ShoppingListItem
   └── references FoodItem
 
-FoodSharingConnection
-  ├── belongs to UserProfile (owner)
-  ├── belongs to UserProfile (recipient)
-  └── grants access to all owner's FoodItems
+Food Sharing (via sharingWith subcollection)
+  └── grants read access to owner's FoodItems
 ```

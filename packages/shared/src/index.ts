@@ -102,17 +102,7 @@ export interface AuthUser {
 // ============================================
 
 /**
- * Represents a one-way sharing relationship between two users.
- * The owner shares ALL their foods with the recipient.
- */
-export interface FoodSharingConnection {
-  ownerId: string;
-  recipientId: string;
-  createdAt: Date;
-}
-
-/**
- * A food item from another user's shared collection
+ * A food item from another user's collection, with owner info
  */
 export interface SharedFood extends FoodItem {
   ownerId: string;

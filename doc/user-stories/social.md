@@ -3,44 +3,29 @@
 ## US-017: Share My Foods
 
 **As a** user  
-**I want to** share all my custom foods with another user  
+**I want to** allow others to view and copy my foods  
 **So that** they can use the same food items for their tracking
 
 **Acceptance Criteria:**
-- Add a user by their user ID to share my foods with them
+- Add a user ID to my sharing list
 - View list of users I'm sharing with
-- Remove a user to stop sharing with them
-- Copy my user ID to share with others
+- Remove a user to revoke their access
+- Copy my user ID to give to others
 
 **See also:** [Food Sharing Design](../food-sharing-design.md)
 
 ---
 
-## US-017a: Access Shared Foods
+## US-017a: View Shared Foods
 
 **As a** user  
-**I want to** browse foods that others have shared with me  
-**So that** I can use them for my meal tracking
+**I want to** view foods from another user  
+**So that** I can see and copy their custom foods
 
 **Acceptance Criteria:**
-- View "Shared with Me" tab in foods list
-- See foods grouped by who shared them
-- View nutrition details of shared foods
-- Copy shared foods to my own collection
-- Use shared foods when logging meals
-
----
-
-## US-017b: Leave Sharing
-
-**As a** user  
-**I want to** stop seeing foods from someone sharing with me  
-**So that** I can manage my shared foods list
-
-**Acceptance Criteria:**
-- View list of users sharing with me
-- Leave with one tap
-- Confirmation before leaving
+- Enter a user ID to view their foods
+- See all their foods with nutrition info
+- Copy any food to my collection with one tap
 
 ---
 
