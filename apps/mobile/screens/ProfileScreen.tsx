@@ -27,7 +27,7 @@ import { auth } from '../config/firebase';
 import { saveUserProfileToFirestore, getUserProfileFromFirestore } from '../utils/firestore';
 import { doc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
 import UserIdDisplay from '../components/UserIdDisplay';
-import AddUserIdInput from '../components/AddUserIdInput';
+import AddUserIdModal from '../components/AddUserIdModal';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -73,6 +73,7 @@ export default function ProfileScreen() {
   const [editingPersonalField, setEditingPersonalField] = useState<'age' | 'height' | 'weight' | 'goal' | null>(null);
   const [sharingWith, setSharingWith] = useState<string[]>([]);
   const [loadingSharing, setLoadingSharing] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
 
   const DISPLAY_NAME_KEY = '@meal_planning:display_name';
   const PROFILE_IMAGE_KEY = '@meal_planning:profile_image';
@@ -970,39 +971,58 @@ export default function ProfileScreen() {
           />
 
           <View style={styles.sharingSection}>
-            <AddUserIdInput
-              onAdd={handleShareWith}
-              label="Share My Foods With"
-              placeholder="Enter user ID"
-              buttonText="Share"
-            />
+            <View style={styles.sharingSectionHeader}>
+              <Text style={styles.sharingListLabel}>Sharing my foods with</Text>
+              <TouchableOpacity
+                style={styles.addShareButton}
+                onPress={() => setShowAddUserModal(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle" size={20} color={colors.primary} />
+                <Text style={styles.addShareButtonText}>Add User</Text>
+              </TouchableOpacity>
+            </View>
 
             {loadingSharing ? (
               <ActivityIndicator style={styles.sharingLoader} color={colors.primary} />
             ) : sharingWith.length > 0 ? (
               <View style={styles.sharingList}>
-                <Text style={styles.sharingListLabel}>Currently sharing with:</Text>
-                {sharingWith.map((userId) => (
-                  <View key={userId} style={styles.sharingListItem}>
-                    <Text style={styles.sharingListUserId} numberOfLines={1} ellipsizeMode="middle">
-                      {userId}
-                    </Text>
+                {sharingWith.map((recipientId) => (
+                  <View key={recipientId} style={styles.sharingListItem}>
+                    <View style={styles.sharingListItemLeft}>
+                      <Ionicons name="person-circle-outline" size={24} color={fontColor.tertiary} />
+                      <Text style={styles.sharingListUserId} numberOfLines={1} ellipsizeMode="middle">
+                        {recipientId}
+                      </Text>
+                    </View>
                     <TouchableOpacity
                       style={styles.removeButton}
-                      onPress={() => handleStopSharing(userId)}
+                      onPress={() => handleStopSharing(recipientId)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="close-circle" size={22} color={colors.cancel} />
+                      <Ionicons name="close-circle" size={24} color={colors.cancel} />
                     </TouchableOpacity>
                   </View>
                 ))}
               </View>
             ) : (
-              <Text style={styles.noSharingText}>
-                You're not sharing your foods with anyone yet.
-              </Text>
+              <View style={styles.emptyShareState}>
+                <Ionicons name="people-outline" size={40} color={colors.border.medium} />
+                <Text style={styles.noSharingText}>
+                  Not sharing with anyone yet
+                </Text>
+                <Text style={styles.noSharingSubtext}>
+                  Tap "Add User" to share your foods
+                </Text>
+              </View>
             )}
           </View>
+
+          <AddUserIdModal
+            visible={showAddUserModal}
+            onClose={() => setShowAddUserModal(false)}
+            onAdd={handleShareWith}
+          />
         </View>
       )}
     </ScrollView>
@@ -1321,13 +1341,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sharingSection: {
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
+  },
+  sharingSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   sharingLoader: {
     marginTop: spacing.xl,
+    marginBottom: spacing.xl,
   },
   sharingList: {
-    marginTop: spacing.lg,
+    gap: spacing.sm,
   },
   sharingListLabel: {
     fontSize: fontSize.sm,
@@ -1335,34 +1362,54 @@ const styles = StyleSheet.create({
     color: fontColor.tertiary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: spacing.sm,
+  },
+  addShareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  addShareButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.primary,
   },
   sharingListItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: colors.background.secondary,
-    borderRadius: 8,
+    borderRadius: 10,
     paddingVertical: spacing.md,
-    paddingLeft: spacing.md,
-    paddingRight: spacing.sm,
-    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  sharingListItemLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   sharingListUserId: {
     flex: 1,
     fontSize: fontSize.sm,
     fontFamily: 'monospace',
     color: fontColor.primary,
-    marginRight: spacing.sm,
   },
   removeButton: {
     padding: spacing.xs,
   },
+  emptyShareState: {
+    alignItems: 'center',
+    paddingVertical: spacing['3xl'],
+    gap: spacing.sm,
+  },
   noSharingText: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.base,
     color: fontColor.tertiary,
-    fontStyle: 'italic',
-    marginTop: spacing.lg,
+    textAlign: 'center',
+  },
+  noSharingSubtext: {
+    fontSize: fontSize.sm,
+    color: fontColor.quaternary,
     textAlign: 'center',
   },
 });
