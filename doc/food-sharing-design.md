@@ -21,7 +21,7 @@ A simple record of who shares with who.
 
 ```typescript
 interface FoodSharingConnection {
-  odwnerId: string;               // User sharing their foods
+  ownerId: string;                // User sharing their foods
   recipientId: string;            // User receiving access
   createdAt: Date;
 }
@@ -326,23 +326,40 @@ service cloud.firestore {
           exists(/databases/$(database)/documents/users/$(request.auth.uid)/sharedWithMe/$(userId));
       }
       
-      // Who I share with
+      // Who I share with (outgoing)
       match /sharingWith/{recipientId} {
+        // Owner can do anything
         allow read, write: if isOwner(userId);
+        
+        // Recipient can delete (when they leave)
+        allow delete: if isOwner(recipientId);
       }
       
-      // Who shares with me
+      // Who shares with me (incoming)
       match /sharedWithMe/{ownerId} {
         // I can read and delete my incoming connections
         allow read, delete: if isOwner(userId);
         
-        // The owner can create/delete this document
+        // The sharer can create/delete this document
         allow create, delete: if isOwner(ownerId);
       }
     }
   }
 }
 ```
+
+### Security Rules Verification
+
+| Action | User | Path | Rule | Result |
+|--------|------|------|------|--------|
+| **Share** | Owner A | `users/A/sharingWith/B` | `isOwner(userId)` | ✅ |
+| **Share** | Owner A | `users/B/sharedWithMe/A` | `isOwner(ownerId)` | ✅ |
+| **Revoke** | Owner A | `users/A/sharingWith/B` | `isOwner(userId)` | ✅ |
+| **Revoke** | Owner A | `users/B/sharedWithMe/A` | `isOwner(ownerId)` | ✅ |
+| **Leave** | Recipient B | `users/B/sharedWithMe/A` | `isOwner(userId)` | ✅ |
+| **Leave** | Recipient B | `users/A/sharingWith/B` | `isOwner(recipientId)` | ✅ |
+| **Read foods** | Recipient B | `users/A/foods/*` | `exists(.../sharedWithMe/A)` | ✅ |
+| **Read foods** | Random C | `users/A/foods/*` | `exists(.../sharedWithMe/A)` | ❌ |
 
 ## Implementation
 
