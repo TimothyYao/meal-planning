@@ -193,6 +193,12 @@ export interface RepositoryContext {
  */
 export interface IFoodSharingRepository {
   /**
+   * Get the current user's ID to share with others.
+   * Returns null if not authenticated.
+   */
+  getCurrentUserId(): string | null;
+
+  /**
    * Share my foods with a user by their user ID.
    * Only writes to my own sharingWith collection.
    */

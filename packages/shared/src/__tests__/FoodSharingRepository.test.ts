@@ -46,6 +46,18 @@ describe('FoodSharingRepository', () => {
     });
   });
 
+  describe('getCurrentUserId', () => {
+    it('returns user ID when authenticated', () => {
+      const repository = new FoodSharingRepository(firestore, contextUserA);
+      expect(repository.getCurrentUserId()).toBe(userAId);
+    });
+
+    it('returns null when not authenticated', () => {
+      const repository = new FoodSharingRepository(firestore, contextLoggedOut);
+      expect(repository.getCurrentUserId()).toBeNull();
+    });
+  });
+
   describe('Authentication', () => {
     it('throws error when user is not authenticated', async () => {
       const repository = new FoodSharingRepository(firestore, contextLoggedOut);

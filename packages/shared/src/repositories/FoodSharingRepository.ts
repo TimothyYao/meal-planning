@@ -16,6 +16,14 @@ export class FoodSharingRepository implements IFoodSharingRepository {
   }
 
   /**
+   * Get the current user's ID.
+   * Returns null if not authenticated.
+   */
+  getCurrentUserId(): string | null {
+    return this.context.getUserId();
+  }
+
+  /**
    * Get the current user ID or throw if not authenticated
    */
   private requireUserId(): string {
