@@ -224,10 +224,20 @@ export interface IFoodSharingRepository {
   /**
    * Get foods from a specific user sharing with me.
    */
-  getFoodsFrom(ownerId: string): Promise<FoodItem[]>;
+  getFoodsFrom(ownerId: string): Promise<SharedFood[]>;
 
   /**
    * Copy a shared food to my collection.
    */
   copyFood(ownerId: string, foodId: string): Promise<FoodItem>;
+
+  /**
+   * Check if I'm currently sharing with a specific user.
+   */
+  isSharingWith(recipientId: string): Promise<boolean>;
+
+  /**
+   * Check if a specific user is sharing with me.
+   */
+  isSharedWithMe(ownerId: string): Promise<boolean>;
 }

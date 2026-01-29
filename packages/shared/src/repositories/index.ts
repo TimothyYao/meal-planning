@@ -10,6 +10,7 @@ export type {
   IFoodRepository,
   IRecipeRepository,
   IDailyLogRepository,
+  IFoodSharingRepository,
   RepositoryContext,
 } from './types';
 
@@ -17,3 +18,4 @@ export type {
 export { FoodRepository } from './FoodRepository';
 export { RecipeRepository } from './RecipeRepository';
 export { DailyLogRepository } from './DailyLogRepository';
+export { FoodSharingRepository } from './FoodSharingRepository';
