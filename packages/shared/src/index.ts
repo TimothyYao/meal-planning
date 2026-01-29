@@ -107,9 +107,9 @@ export interface AuthUser {
 export type SharePermission = 'view' | 'copy';
 
 /**
- * Status of a food share
+ * Status of a sharing connection
  */
-export type ShareStatus = 'pending' | 'active' | 'revoked';
+export type ConnectionStatus = 'active' | 'revoked';
 
 /**
  * Status of a share invite
@@ -117,72 +117,37 @@ export type ShareStatus = 'pending' | 'active' | 'revoked';
 export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
 
 /**
- * Represents a sharing permission granted to another user for a food item.
+ * Represents a one-way sharing relationship between two users.
+ * The owner shares ALL their foods with the recipient.
  */
-export interface FoodShare {
+export interface FoodSharingConnection {
   id: string;
-  foodId: string;
   ownerId: string;
+  ownerEmail: string;
+  ownerDisplayName?: string;
   sharedWithUserId: string;
-  sharedWithEmail?: string;
+  sharedWithEmail: string;
+  sharedWithDisplayName?: string;
   permission: SharePermission;
-  status: ShareStatus;
+  status: ConnectionStatus;
   createdAt: Date;
   updatedAt: Date;
-  expiresAt?: Date;
-  note?: string;
 }
 
 /**
- * A shareable invite code for foods that can be used by multiple users.
+ * A shareable invite code that establishes a sharing connection.
  */
 export interface ShareInvite {
   id: string;
   code: string;
   ownerId: string;
-  ownerEmail?: string;
+  ownerEmail: string;
   ownerDisplayName?: string;
-  foodIds: string[];
   permission: SharePermission;
   status: InviteStatus;
-  maxUses: number;
-  useCount: number;
-  usedBy: string[];
+  acceptedByUserId?: string;
   createdAt: Date;
   expiresAt: Date;
-}
-
-/**
- * Denormalized view of a shared food stored in the recipient's subcollection.
- */
-export interface SharedFoodAccess {
-  id: string;
-  foodId: string;
-  ownerId: string;
-  ownerEmail?: string;
-  ownerDisplayName?: string;
-  food: FoodItem;
-  permission: SharePermission;
-  sharedAt: Date;
-  expiresAt?: Date;
-}
-
-/**
- * Options for sharing a food with another user
- */
-export interface ShareOptions {
-  permission: SharePermission;
-  expiresAt?: Date;
-  note?: string;
-}
-
-/**
- * Options for creating a share invite
- */
-export interface InviteOptions {
-  permission: SharePermission;
-  expiresAt?: Date;
-  maxUses?: number;
 }
 
 /**
@@ -190,59 +155,41 @@ export interface InviteOptions {
  */
 export interface ShareResult {
   success: boolean;
-  shareId?: string;
+  connectionId?: string;
   inviteId?: string;
   error?: string;
 }
 
 /**
- * Preview information for a share invite
- */
-export interface InvitePreview {
-  ownerDisplayName: string;
-  ownerEmail?: string;
-  foods: Array<{ name: string; macros: MacroTargets }>;
-  permission: SharePermission;
-  expiresAt: Date;
-  remainingUses: number;
-}
-
-/**
  * Result of accepting a share invite
  */
-export interface AcceptInviteResult {
+export interface AcceptResult {
   success: boolean;
-  foodsAdded: number;
+  connectionId?: string;
+  ownerName?: string;
+  foodCount?: number;
   error?: string;
 }
 
 /**
- * Notification types for sharing events
+ * Preview information for a share code
  */
-export type ShareNotificationType = 
-  | 'food_shared'
-  | 'invite_accepted'
-  | 'share_revoked'
-  | 'invite_expiring';
+export interface ShareCodePreview {
+  ownerDisplayName: string;
+  ownerEmail: string;
+  permission: SharePermission;
+  foodCount: number;
+  expiresAt: Date;
+}
 
 /**
- * Notification data for sharing events
+ * A food item from another user's shared collection
  */
-export interface ShareNotification {
-  id: string;
-  userId: string;
-  type: ShareNotificationType;
-  title: string;
-  message: string;
-  data: {
-    foodId?: string;
-    shareId?: string;
-    inviteCode?: string;
-    ownerId?: string;
-    ownerName?: string;
-  };
-  read: boolean;
-  createdAt: Date;
+export interface SharedFood extends FoodItem {
+  ownerId: string;
+  ownerDisplayName?: string;
+  ownerEmail?: string;
+  canCopy: boolean;
 }
 
 // Utility functions

@@ -236,73 +236,54 @@ An item on a shopping list.
 
 ## Food Sharing Models
 
-### FoodShare
-Represents a sharing permission granted to another user for a food item.
+### FoodSharingConnection
+Represents a one-way sharing relationship between two users. The owner shares ALL their foods with the recipient.
 
 **Fields:**
 - `id`: string (unique identifier)
-- `foodId`: string (reference to the shared food)
-- `ownerId`: string (user ID of the food owner)
+- `ownerId`: string (user ID of the person sharing)
+- `ownerEmail`: string (owner's email)
+- `ownerDisplayName`: string (optional, owner's display name)
 - `sharedWithUserId`: string (user ID of the recipient)
-- `sharedWithEmail`: string (optional, email used for sharing)
-- `permission`: 'view' | 'copy' (permission level)
-- `status`: 'pending' | 'active' | 'revoked'
+- `sharedWithEmail`: string (recipient's email)
+- `sharedWithDisplayName`: string (optional, recipient's display name)
+- `permission`: 'view' | 'copy' (can recipient copy foods?)
+- `status`: 'active' | 'revoked'
 - `createdAt`: Date
 - `updatedAt`: Date
-- `expiresAt`: Date (optional, expiration date)
-- `note`: string (optional, message from the sharer)
 
 **Relationships:**
 - Belongs to UserProfile (owner)
-- References FoodItem
-- References UserProfile (recipient)
+- Belongs to UserProfile (recipient)
+- Grants access to all owner's FoodItems
+
+**Storage:**
+- Stored in `users/{ownerId}/sharingWith/{connectionId}` (owner's view)
+- Stored in `users/{recipientId}/sharedWithMe/{connectionId}` (recipient's view)
 
 ---
 
 ### ShareInvite
-A shareable invite code for foods that can be used by multiple users.
+A shareable code that establishes a sharing connection when accepted.
 
 **Fields:**
 - `id`: string (unique identifier)
-- `code`: string (unique 8-character invite code)
+- `code`: string (8-character invite code, e.g., "ABCD-1234")
 - `ownerId`: string (user ID of the inviter)
-- `ownerEmail`: string (optional, email of the inviter)
-- `ownerDisplayName`: string (optional, display name of the inviter)
-- `foodIds`: string[] (foods included in the invite)
-- `permission`: 'view' | 'copy' (permission level)
+- `ownerEmail`: string (inviter's email)
+- `ownerDisplayName`: string (optional, inviter's display name)
+- `permission`: 'view' | 'copy' (permission to grant)
 - `status`: 'pending' | 'accepted' | 'expired' | 'revoked'
-- `maxUses`: number (maximum uses allowed)
-- `useCount`: number (current use count)
-- `usedBy`: string[] (user IDs who have used this invite)
+- `acceptedByUserId`: string (optional, who accepted the invite)
 - `createdAt`: Date
-- `expiresAt`: Date
+- `expiresAt`: Date (default: 7 days)
 
 **Relationships:**
 - Belongs to UserProfile (owner)
-- References multiple FoodItems
+- Creates FoodSharingConnection when accepted
 
----
-
-### SharedFoodAccess
-Denormalized view of a shared food stored in the recipient's subcollection.
-
-**Fields:**
-- `id`: string (same as foodId)
-- `foodId`: string (reference to the original food)
-- `ownerId`: string (user ID of the food owner)
-- `ownerEmail`: string (optional, owner's email)
-- `ownerDisplayName`: string (optional, owner's display name)
-- `food`: FoodItem (embedded snapshot)
-- `permission`: 'view' | 'copy'
-- `sharedAt`: Date
-- `expiresAt`: Date (optional)
-
-**Relationships:**
-- Belongs to UserProfile (recipient)
-- References FoodItem (embedded)
-- References UserProfile (owner)
-
-**Note:** This denormalized structure allows efficient querying of shared foods without requiring joins or multiple document reads.
+**Storage:**
+- Stored in `shareInvites/{code}` (global collection for lookup)
 
 ---
 
@@ -402,17 +383,12 @@ ShoppingList
 ShoppingListItem
   └── references FoodItem
 
-FoodShare
+FoodSharingConnection
   ├── belongs to UserProfile (owner)
-  ├── references UserProfile (recipient)
-  └── references FoodItem
+  ├── belongs to UserProfile (recipient)
+  └── grants access to all owner's FoodItems
 
 ShareInvite
   ├── belongs to UserProfile (owner)
-  └── references many FoodItems
-
-SharedFoodAccess
-  ├── belongs to UserProfile (recipient)
-  ├── references UserProfile (owner)
-  └── embeds FoodItem (snapshot)
+  └── creates FoodSharingConnection when accepted
 ```

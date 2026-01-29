@@ -1,37 +1,23 @@
 # User Stories: Social & Sharing
 
-## US-017: Share Foods with Others
+## US-017: Share My Foods Library
 
 **As a** user  
-**I want to** share my custom foods with family members or friends  
+**I want to** share all my custom foods with family members or friends  
 **So that** they can use the same food items for their tracking
 
 **Acceptance Criteria:**
-- Share a food via email address
-- Share a food via shareable code/link
+- Share my foods via email address (creates direct connection)
+- Share my foods via shareable code (for messaging, etc.)
 - Set permission level (view only or view & copy)
-- Set expiration date for shares (optional)
-- Include a note when sharing
+- View list of people I'm sharing with
+- Stop sharing with someone at any time
 
 **See also:** [Food Sharing Design](../food-sharing-design.md)
 
 ---
 
-## US-017a: Manage Food Sharing
-
-**As a** food owner  
-**I want to** manage who has access to my shared foods  
-**So that** I can control who can see and use my custom foods
-
-**Acceptance Criteria:**
-- View all users a food is shared with
-- Revoke access from specific users
-- View and delete active share links
-- See share usage statistics (uses remaining)
-
----
-
-## US-017b: View Shared Foods
+## US-017a: Access Shared Foods
 
 **As a** user  
 **I want to** browse foods that others have shared with me  
@@ -42,22 +28,35 @@
 - See foods grouped by who shared them
 - View nutrition details of shared foods
 - Copy shared foods to my collection (if permitted)
-- Enter a share code to accept shared foods
+- Use shared foods when logging meals
 
 ---
 
-## US-017c: Accept Share Invites
+## US-017b: Accept Share Code
 
 **As a** user  
-**I want to** accept food sharing invitations  
-**So that** I can access foods shared by others
+**I want to** accept a share code from another user  
+**So that** I can access their food library
 
 **Acceptance Criteria:**
 - Enter a share code manually
-- Preview foods before accepting
-- See who shared and what permissions are granted
-- One-tap to accept and add foods
+- Preview who is sharing and permission level
+- One-tap to accept and establish connection
 - Handle expired or invalid codes gracefully
+
+---
+
+## US-017c: Leave Sharing Connection
+
+**As a** user  
+**I want to** stop seeing foods from someone sharing with me  
+**So that** I can manage my shared foods list
+
+**Acceptance Criteria:**
+- View list of people sharing with me
+- Leave a connection with one tap
+- Confirmation before leaving
+- Can re-connect later with a new share code
 
 ---
 

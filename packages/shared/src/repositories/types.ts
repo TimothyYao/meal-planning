@@ -9,14 +9,13 @@ import type {
   DailyLog, 
   Meal, 
   MacroTargets,
-  FoodShare,
+  FoodSharingConnection,
   ShareInvite,
-  SharedFoodAccess,
-  ShareOptions,
-  InviteOptions,
   ShareResult,
-  InvitePreview,
-  AcceptInviteResult,
+  AcceptResult,
+  ShareCodePreview,
+  SharedFood,
+  SharePermission,
 } from '../index';
 
 /**
@@ -194,101 +193,93 @@ export interface RepositoryContext {
 }
 
 /**
- * Shared food repository interface for managing food sharing operations.
- * Handles both outgoing shares (sharing your foods) and incoming shares
- * (foods shared with you).
+ * Food sharing repository interface for managing sharing connections.
+ * Users share their ENTIRE food library with other users via connections.
  */
-export interface ISharedFoodRepository {
-  // === Sharing Operations (Owner/Outgoing) ===
+export interface IFoodSharingRepository {
+  // === Managing who I share with (outgoing) ===
 
   /**
-   * Share a food with another user by email.
-   * If the user exists, creates a direct share.
-   * If the user doesn't exist, creates an invite that will be linked when they sign up.
+   * Share my foods with another user by email.
+   * If the user exists, creates a direct connection.
+   * If not, creates a share invite that will link when they sign up.
    */
-  shareFood(
-    foodId: string,
-    recipientEmail: string,
-    options: ShareOptions
+  shareWithUser(
+    email: string,
+    permission: SharePermission
   ): Promise<ShareResult>;
 
   /**
-   * Create a shareable invite code for one or more foods.
-   * The code can be shared via text, email, or other means.
+   * Create a share code for someone to connect with me.
    */
-  createInvite(
-    foodIds: string[],
-    options: InviteOptions
-  ): Promise<ShareInvite>;
+  createShareCode(permission: SharePermission): Promise<ShareInvite>;
 
   /**
-   * Get all shares created by the current user (outgoing).
+   * Get list of users I'm sharing my foods with.
    */
-  getOutgoingShares(): Promise<FoodShare[]>;
+  getSharingWith(): Promise<FoodSharingConnection[]>;
 
   /**
-   * Get all shares for a specific food owned by the current user.
+   * Stop sharing my foods with a user.
    */
-  getSharesForFood(foodId: string): Promise<FoodShare[]>;
+  stopSharingWith(connectionId: string): Promise<void>;
 
   /**
-   * Get all active invite codes created by the current user.
+   * Revoke a share code.
    */
-  getActiveInvites(): Promise<ShareInvite[]>;
+  revokeShareCode(inviteId: string): Promise<void>;
 
   /**
-   * Revoke a direct share, removing the recipient's access.
+   * Get active share codes I've created.
    */
-  revokeShare(shareId: string): Promise<void>;
+  getActiveShareCodes(): Promise<ShareInvite[]>;
+
+  // === Managing who shares with me (incoming) ===
 
   /**
-   * Revoke/deactivate a share invite code.
+   * Get list of users sharing their foods with me.
    */
-  revokeInvite(inviteId: string): Promise<void>;
-
-  // === Receiving Operations (Recipient/Incoming) ===
+  getSharedWithMe(): Promise<FoodSharingConnection[]>;
 
   /**
-   * Get all foods shared with the current user (incoming).
-   * Filters out expired shares automatically.
+   * Preview a share code before accepting.
    */
-  getSharedFoods(): Promise<SharedFoodAccess[]>;
+  previewShareCode(code: string): Promise<ShareCodePreview | null>;
 
   /**
-   * Get foods shared with the current user, grouped by owner.
+   * Accept a share code from another user.
    */
-  getSharedFoodsGroupedByOwner(): Promise<Map<string, SharedFoodAccess[]>>;
+  acceptShareCode(code: string): Promise<AcceptResult>;
 
   /**
-   * Get a specific shared food by ID.
+   * Leave a sharing connection (stop seeing their foods).
    */
-  getSharedFoodById(foodId: string): Promise<SharedFoodAccess | null>;
+  leaveConnection(connectionId: string): Promise<void>;
+
+  // === Accessing shared foods ===
 
   /**
-   * Preview an invite before accepting it.
-   * Returns null if the invite is invalid, expired, or fully used.
+   * Get all foods from users sharing with me.
    */
-  previewInvite(code: string): Promise<InvitePreview | null>;
+  getSharedFoods(): Promise<SharedFood[]>;
 
   /**
-   * Accept a share invite, adding the foods to the user's shared foods.
+   * Get foods from a specific user sharing with me.
    */
-  acceptInvite(code: string): Promise<AcceptInviteResult>;
-
-  /**
-   * Copy a shared food to the user's own collection.
-   * Only works if the share permission allows copying.
-   */
-  copySharedFood(foodId: string, newName?: string): Promise<FoodItem>;
-
-  /**
-   * Hide a shared food from view (doesn't affect the owner's share).
-   * The user can still access the food again via the share code if available.
-   */
-  hideSharedFood(foodId: string): Promise<void>;
+  getFoodsFromUser(ownerId: string): Promise<SharedFood[]>;
 
   /**
    * Search shared foods by name.
    */
-  searchSharedFoods(query: string): Promise<SharedFoodAccess[]>;
+  searchSharedFoods(query: string): Promise<SharedFood[]>;
+
+  /**
+   * Copy a shared food to my collection.
+   * Only works if the connection permission allows copying.
+   */
+  copyFood(
+    ownerId: string,
+    foodId: string,
+    newName?: string
+  ): Promise<FoodItem>;
 }
