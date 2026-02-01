@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      
+      // Foods - owner has full access, shared users can read
+      match /foods/{foodId} {
+        allow read, write: if isOwner(userId);
+        allow read: if isAuthenticated() && 
+          exists(/databases/$(database)/documents/users/$(userId)/sharingWith/$(request.auth.uid));
+      }
+      
+      // Sharing list - only owner can manage
+      match /sharingWith/{recipientId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+  }
+}
