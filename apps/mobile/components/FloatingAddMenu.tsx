@@ -1,4 +1,4 @@
-import { StyleSheet, View, TouchableOpacity, Animated, Modal, Pressable, Text, Alert, Dimensions } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Animated, Modal, Pressable, Text, Dimensions, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,9 +13,16 @@ interface FloatingAddMenuProps {
   onClose: () => void;
   onCustomFood: () => void;
   onSearch: () => void;
+  onCreateRecipe: () => void;
 }
 
-export default function FloatingAddMenu({ visible, onClose, onCustomFood, onSearch }: FloatingAddMenuProps) {
+export default function FloatingAddMenu({
+  visible,
+  onClose,
+  onCustomFood,
+  onSearch,
+  onCreateRecipe,
+}: FloatingAddMenuProps) {
   const insets = useSafeAreaInsets();
   const [recentFoods, setRecentFoods] = useState<Array<{ food: FoodItem; lastAdded: Date }>>([]);
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -95,7 +102,7 @@ export default function FloatingAddMenu({ visible, onClose, onCustomFood, onSear
 
   const handleCreateRecipe = () => {
     onClose();
-    Alert.alert('Coming Soon', 'Recipe creation feature will be available soon.');
+    onCreateRecipe();
   };
 
   const handleSearch = () => {

@@ -36,6 +36,7 @@ describe('FloatingAddMenu', () => {
     onClose: jest.fn(),
     onCustomFood: jest.fn(),
     onSearch: jest.fn(),
+    onCreateRecipe: jest.fn(),
   };
 
   beforeEach(() => {
@@ -105,8 +106,16 @@ describe('FloatingAddMenu', () => {
       expect(onSearch).toHaveBeenCalled();
     });
 
-    it('shows coming soon alert for Recipe', async () => {
-      const { getByText } = render(<FloatingAddMenu {...defaultProps} />);
+    it('calls onCreateRecipe and onClose for Recipe', async () => {
+      const onClose = jest.fn();
+      const onCreateRecipe = jest.fn();
+      const { getByText } = render(
+        <FloatingAddMenu
+          {...defaultProps}
+          onClose={onClose}
+          onCreateRecipe={onCreateRecipe}
+        />
+      );
 
       await waitFor(() => {
         expect(getByText('Recipe')).toBeTruthy();
@@ -114,10 +123,8 @@ describe('FloatingAddMenu', () => {
 
       fireEvent.press(getByText('Recipe'));
 
-      expect(Alert.alert).toHaveBeenCalledWith(
-        'Coming Soon',
-        'Recipe creation feature will be available soon.'
-      );
+      expect(onClose).toHaveBeenCalled();
+      expect(onCreateRecipe).toHaveBeenCalled();
     });
 
     it('shows coming soon alert for Scan', async () => {

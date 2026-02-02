@@ -73,8 +73,7 @@ export default function AddFoodMenuScreen() {
   };
 
   const handleCreateRecipe = () => {
-    // Placeholder for future implementation
-    Alert.alert('Coming Soon', 'Recipe creation feature will be available soon.');
+    (navigation as any).navigate('MainTabs', { screen: 'Recipes' });
   };
 
   return (
