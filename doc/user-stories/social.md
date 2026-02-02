@@ -1,5 +1,34 @@
 # User Stories: Social & Sharing
 
+## US-017: Share My Foods
+
+**As a** user  
+**I want to** allow others to view and copy my foods  
+**So that** they can use the same food items for their tracking
+
+**Acceptance Criteria:**
+- Add a user ID to my sharing list
+- View list of users I'm sharing with
+- Remove a user to revoke their access
+- Copy my user ID to give to others
+
+**See also:** [Food Sharing Design](../food-sharing-design.md)
+
+---
+
+## US-017a: View Shared Foods
+
+**As a** user  
+**I want to** view foods from another user  
+**So that** I can see and copy their custom foods
+
+**Acceptance Criteria:**
+- Enter a user ID to view their foods
+- See all their foods with nutrition info
+- Copy any food to my collection with one tap
+
+---
+
 ## US-018: Share Meal Plans
 
 **As a** user  

@@ -234,6 +234,19 @@ An item on a shopping list.
 
 ---
 
+## Food Sharing
+
+Food sharing is managed through a simple `sharingWith` subcollection. Owner adds recipient user IDs to grant access. Security rules enforce that only listed users can read the owner's foods.
+
+**Storage:**
+- `users/{ownerId}/sharingWith/{recipientId}` - document with `{ added: Date }`
+
+**Access Control:**
+- Firestore security rules check if reader's ID exists in owner's `sharingWith` collection
+- No separate "sharedWithMe" collection needed
+
+---
+
 ## Additional Models (Future)
 
 ### ProgressEntry
@@ -290,7 +303,10 @@ UserProfile
   ├── has many DailyLogs
   ├── has many Recipes
   ├── has many MealPlans
-  └── has many ShoppingLists
+  ├── has many ShoppingLists
+  ├── has many FoodShares (outgoing)
+  ├── has many SharedFoodAccess (incoming)
+  └── has many ShareInvites
 
 DailyLog
   ├── belongs to UserProfile
@@ -326,4 +342,7 @@ ShoppingList
 
 ShoppingListItem
   └── references FoodItem
+
+Food Sharing (via sharingWith subcollection)
+  └── grants read access to owner's FoodItems
 ```

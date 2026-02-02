@@ -3,7 +3,14 @@
  * These provide a clean abstraction over Firestore operations with local caching support.
  */
 
-import type { FoodItem, Recipe, DailyLog, Meal, MacroTargets } from '../index';
+import type { 
+  FoodItem, 
+  Recipe, 
+  DailyLog, 
+  Meal, 
+  MacroTargets,
+  SharedFood,
+} from '../index';
 
 /**
  * Firestore-like document reference for type compatibility
@@ -177,4 +184,48 @@ export interface RepositoryContext {
    * Get current date in YYYY-MM-DD format
    */
   getCurrentDate(): string;
+}
+
+/**
+ * Food sharing repository interface.
+ * Owner controls who can view their foods via sharingWith list.
+ * Recipients view foods by knowing the owner's user ID.
+ */
+export interface IFoodSharingRepository {
+  /**
+   * Get the current user's ID to share with others.
+   * Returns null if not authenticated.
+   */
+  getCurrentUserId(): string | null;
+
+  /**
+   * Share my foods with a user by their user ID.
+   * Only writes to my own sharingWith collection.
+   */
+  shareWith(recipientId: string): Promise<void>;
+
+  /**
+   * Stop sharing my foods with a user.
+   */
+  stopSharingWith(recipientId: string): Promise<void>;
+
+  /**
+   * Get list of user IDs I'm sharing my foods with.
+   */
+  getSharingWith(): Promise<string[]>;
+
+  /**
+   * Check if I'm currently sharing with a specific user.
+   */
+  isSharingWith(recipientId: string): Promise<boolean>;
+
+  /**
+   * Get foods from a specific user by their user ID.
+   */
+  getFoodsFrom(ownerId: string): Promise<SharedFood[]>;
+
+  /**
+   * Copy a food to my collection.
+   */
+  copyFood(ownerId: string, foodId: string): Promise<FoodItem>;
 }

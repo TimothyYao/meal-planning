@@ -97,6 +97,17 @@ export interface AuthUser {
   photoURL: string | null;
 }
 
+// ============================================
+// Food Sharing Types
+// ============================================
+
+/**
+ * A food item from another user's collection, with owner info
+ */
+export interface SharedFood extends FoodItem {
+  ownerId: string;
+}
+
 // Utility functions
 export function calculateMacros(foods: MealFood[]): MacroTargets {
   return foods.reduce(

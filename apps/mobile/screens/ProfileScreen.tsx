@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -20,11 +20,14 @@ import { NumberEditor } from '../components/NumberEditor';
 import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { storage } from '../config/firebase';
+import { storage, db } from '../config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { saveUserProfileToFirestore, getUserProfileFromFirestore } from '../utils/firestore';
+import { doc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
+import UserIdDisplay from '../components/UserIdDisplay';
+import AddUserIdModal from '../components/AddUserIdModal';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -68,6 +71,9 @@ export default function ProfileScreen() {
   const [weight, setWeight] = useState<number | null>(null);
   const [goal, setGoal] = useState<'lose' | 'maintain' | 'gain' | null>(null);
   const [editingPersonalField, setEditingPersonalField] = useState<'age' | 'height' | 'weight' | 'goal' | null>(null);
+  const [sharingWith, setSharingWith] = useState<string[]>([]);
+  const [loadingSharing, setLoadingSharing] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
 
   const DISPLAY_NAME_KEY = '@meal_planning:display_name';
   const PROFILE_IMAGE_KEY = '@meal_planning:profile_image';
@@ -78,6 +84,11 @@ export default function ProfileScreen() {
     loadDisplayName();
     loadProfileImage();
     loadPersonalInfo();
+    if (user) {
+      loadSharingWith();
+    } else {
+      setSharingWith([]);
+    }
   }, [user]);
 
   const loadTargets = async () => {
@@ -499,6 +510,77 @@ export default function ProfileScreen() {
     ? (weight / ((height / 100) ** 2)).toFixed(1)
     : null;
 
+  // Food Sharing Functions
+  const loadSharingWith = useCallback(async () => {
+    if (!user) return;
+    
+    setLoadingSharing(true);
+    try {
+      const sharingWithRef = collection(db, `users/${user.uid}/sharingWith`);
+      const snapshot = await getDocs(sharingWithRef);
+      const userIds = snapshot.docs.map(doc => doc.id);
+      setSharingWith(userIds);
+    } catch (error) {
+      console.error('Error loading sharing list:', error);
+    } finally {
+      setLoadingSharing(false);
+    }
+  }, [user]);
+
+  const handleShareWith = async (recipientId: string) => {
+    if (!user) {
+      throw new Error('Please sign in to share foods');
+    }
+
+    const trimmedId = recipientId.trim();
+    
+    if (trimmedId === user.uid) {
+      throw new Error('Cannot share with yourself');
+    }
+
+    if (sharingWith.includes(trimmedId)) {
+      throw new Error('Already sharing with this user');
+    }
+
+    // Add to Firestore
+    const sharingRef = doc(db, `users/${user.uid}/sharingWith`, trimmedId);
+    await setDoc(sharingRef, { added: new Date() });
+
+    // Update local state
+    setSharingWith(prev => [...prev, trimmedId]);
+    
+    Alert.alert('Success', 'Now sharing your foods with this user');
+  };
+
+  const handleStopSharing = async (recipientId: string) => {
+    if (!user) return;
+
+    Alert.alert(
+      'Stop Sharing',
+      'Are you sure you want to stop sharing your foods with this user?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Stop Sharing',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Remove from Firestore
+              const sharingRef = doc(db, `users/${user.uid}/sharingWith`, recipientId);
+              await deleteDoc(sharingRef);
+
+              // Update local state
+              setSharingWith(prev => prev.filter(id => id !== recipientId));
+            } catch (error) {
+              console.error('Error stopping sharing:', error);
+              Alert.alert('Error', 'Failed to stop sharing. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <ScrollView 
       style={styles.container} 
@@ -877,6 +959,72 @@ export default function ProfileScreen() {
           </View>
         )}
       </View>
+
+      {user && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Food Sharing</Text>
+          
+          <UserIdDisplay 
+            userId={user.uid}
+            label="My User ID"
+            description="Share this ID with others so they can add you and view your foods."
+          />
+
+          <View style={styles.sharingSection}>
+            <View style={styles.sharingSectionHeader}>
+              <Text style={styles.sharingListLabel}>Sharing my foods with</Text>
+              <TouchableOpacity
+                style={styles.addShareButton}
+                onPress={() => setShowAddUserModal(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle" size={20} color={colors.primary} />
+                <Text style={styles.addShareButtonText}>Add User</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loadingSharing ? (
+              <ActivityIndicator style={styles.sharingLoader} color={colors.primary} />
+            ) : sharingWith.length > 0 ? (
+              <View style={styles.sharingList}>
+                {sharingWith.map((recipientId) => (
+                  <View key={recipientId} style={styles.sharingListItem}>
+                    <View style={styles.sharingListItemLeft}>
+                      <Ionicons name="person-circle-outline" size={24} color={fontColor.tertiary} />
+                      <Text style={styles.sharingListUserId} numberOfLines={1} ellipsizeMode="middle">
+                        {recipientId}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => handleStopSharing(recipientId)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="close-circle" size={24} color={colors.cancel} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyShareState}>
+                <Ionicons name="people-outline" size={40} color={colors.border.medium} />
+                <Text style={styles.noSharingText}>
+                  Not sharing with anyone yet
+                </Text>
+                <Text style={styles.noSharingSubtext}>
+                  Tap "Add User" to share your foods
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <AddUserIdModal
+            visible={showAddUserModal}
+            onClose={() => setShowAddUserModal(false)}
+            onAdd={handleShareWith}
+          />
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -1191,5 +1339,77 @@ const styles = StyleSheet.create({
     color: fontColor.inverse,
     fontSize: fontSize.base,
     fontWeight: '600',
+  },
+  sharingSection: {
+    marginTop: spacing.xl,
+  },
+  sharingSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  sharingLoader: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.xl,
+  },
+  sharingList: {
+    gap: spacing.sm,
+  },
+  sharingListLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: fontColor.tertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  addShareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  addShareButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  sharingListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background.secondary,
+    borderRadius: 10,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  sharingListItemLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  sharingListUserId: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontFamily: 'monospace',
+    color: fontColor.primary,
+  },
+  removeButton: {
+    padding: spacing.xs,
+  },
+  emptyShareState: {
+    alignItems: 'center',
+    paddingVertical: spacing['3xl'],
+    gap: spacing.sm,
+  },
+  noSharingText: {
+    fontSize: fontSize.base,
+    color: fontColor.tertiary,
+    textAlign: 'center',
+  },
+  noSharingSubtext: {
+    fontSize: fontSize.sm,
+    color: fontColor.quaternary,
+    textAlign: 'center',
   },
 });
