@@ -29,6 +29,12 @@
           "color": "#ffffff",
           "sounds": []
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan nutrition labels."
+        }
       ]
     ],
     "android": {
